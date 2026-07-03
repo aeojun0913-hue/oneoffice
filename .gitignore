@@ -1,0 +1,10 @@
+# 🔐 OneOffice API & Credentials Excludes
+.env
+credentials.md
+
+# OS & Environment files
+.DS_Store
+Thumbs.db
+node_modules/
+*.tmp
+database.json.tmp
