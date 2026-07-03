@@ -484,7 +484,7 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
 
   // ── Google Gemini 1.5 Flash — 단독 AI 제공자 ─────────────────
   try {
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
     const response = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
