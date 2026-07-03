@@ -475,8 +475,8 @@ app.post('/api/ai/generate', aiLimiter, requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, error: '프롬프트가 비어있습니다.' });
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const nvidiaKey = process.env.NVIDIA_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || 'AIzaSyAezv0644G4yvEN_GbXTk1T0WL4ptNcEf4';
+  const nvidiaKey = process.env.NVIDIA_API_KEY || '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';
 
   // ── NVIDIA NIM API (1순위) ──────────────────────────────────────
   if (nvidiaKey) {
