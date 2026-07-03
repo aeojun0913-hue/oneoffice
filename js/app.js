@@ -1236,58 +1236,82 @@ window.renderMarketItems = function() {
 let kakaoMapInstance = null;
 let kakaoMapMarkers  = [];
 let _kakaoMapRetryCount = 0;
+let _kakaoMapLoading = false;
 
 function _initWelfareMap() {
   const container = document.getElementById('kakaoMapContainer');
   if (!container) return;
 
-  // 이미 지도가 초기화된 경우 스킵 (relayout만 호출)
+  // 이미 지도가 초기화된 경우 relayout만 호출
   if (kakaoMapInstance) {
     kakaoMapInstance.relayout();
     return;
   }
 
-  // 카카오 SDK가 아직 로드되지 않은 경우 재시도
-  if (!window.kakao || !window.kakao.maps) {
-    if (_kakaoMapRetryCount < 10) {
-      _kakaoMapRetryCount++;
-      setTimeout(_initWelfareMap, 500);
-    }
+  // 중복 로딩 방지
+  if (_kakaoMapLoading) return;
+  _kakaoMapLoading = true;
+
+  // 로딩 스피너 표시
+  container.innerHTML = `
+    <div style="text-align:center;color:var(--text-muted);">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;margin-bottom:10px;color:var(--primary);display:block;"></i>
+      <div style="font-size:0.85rem;">지도 불러오는 중...</div>
+    </div>`;
+
+  // kakao SDK가 없으면 에러 표시
+  if (!window.kakao) {
+    container.innerHTML = `
+      <div style="text-align:center;color:var(--text-muted);">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;margin-bottom:10px;color:var(--warning);display:block;"></i>
+        <div style="font-size:0.85rem;">카카오맵 SDK 로드 실패</div>
+        <div style="font-size:0.75rem;margin-top:4px;">네트워크 연결을 확인해주세요</div>
+      </div>`;
+    _kakaoMapLoading = false;
     return;
   }
 
-  _kakaoMapRetryCount = 0;
+  // autoload=false이므로 kakao.maps.load() 콜백으로 초기화
+  kakao.maps.load(() => {
+    try {
+      container.innerHTML = '';
 
-  // 컨테이너 초기 안내 텍스트 제거
-  container.innerHTML = '';
-  container.style.display = 'block';
+      // 기본 좌표: 역삼역 (테헤란로 주변)
+      const defaultLoc = new kakao.maps.LatLng(37.5006, 127.0364);
 
-  // 기본 좌표: 역삼역 (테헤란로 주변)
-  const defaultLoc = new kakao.maps.LatLng(37.5006, 127.0364);
+      kakaoMapInstance = new kakao.maps.Map(container, {
+        center: defaultLoc,
+        level: 3
+      });
 
-  const options = {
-    center: defaultLoc,
-    level: 3
-  };
+      // 기본 마커 (회사 위치)
+      const companyMarker = new kakao.maps.Marker({
+        position: defaultLoc,
+        map: kakaoMapInstance
+      });
 
-  kakaoMapInstance = new kakao.maps.Map(container, options);
+      new kakao.maps.InfoWindow({
+        content: '<div style="padding:5px;color:#000;font-size:0.75rem;font-weight:700;">🏢 Antigravity Secure Hub</div>'
+      }).open(kakaoMapInstance, companyMarker);
 
-  // 기본 마커 (회사 위치)
-  const companyMarker = new kakao.maps.Marker({
-    position: defaultLoc,
-    map: kakaoMapInstance
+      _kakaoMapLoading = false;
+
+      // 초기 주변 맛집 로드
+      window.searchNearbyRestaurants();
+
+    } catch(err) {
+      console.error('카카오맵 초기화 오류:', err);
+      container.innerHTML = `
+        <div style="text-align:center;color:var(--text-muted);">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;margin-bottom:10px;color:var(--danger);display:block;"></i>
+          <div style="font-size:0.85rem;">지도 초기화 실패: ${err.message}</div>
+        </div>`;
+      _kakaoMapLoading = false;
+    }
   });
-
-  const infowindow = new kakao.maps.InfoWindow({
-    content: '<div style="padding:5px;color:#000;font-size:0.75rem;font-weight:700;">🏢 Antigravity Secure Hub</div>'
-  });
-  infowindow.open(kakaoMapInstance, companyMarker);
-
-  // 초기 주변 맛집 로드
-  window.searchNearbyRestaurants();
 }
 
-// 전역 노출 (복지 탭 클릭 시 수동 호출 가능하게)
+// 전역 노출
 window.initWelfareMap = _initWelfareMap;
 
 window.searchNearbyRestaurants = function() {
