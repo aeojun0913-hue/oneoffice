@@ -1235,13 +1235,32 @@ window.renderMarketItems = function() {
 // ═══════════════════════════════════════════════════════════════════════
 let kakaoMapInstance = null;
 let kakaoMapMarkers  = [];
+let _kakaoMapRetryCount = 0;
 
 function _initWelfareMap() {
   const container = document.getElementById('kakaoMapContainer');
-  if (!container || !window.kakao || !window.kakao.maps) return;
+  if (!container) return;
+
+  // 이미 지도가 초기화된 경우 스킵 (relayout만 호출)
+  if (kakaoMapInstance) {
+    kakaoMapInstance.relayout();
+    return;
+  }
+
+  // 카카오 SDK가 아직 로드되지 않은 경우 재시도
+  if (!window.kakao || !window.kakao.maps) {
+    if (_kakaoMapRetryCount < 10) {
+      _kakaoMapRetryCount++;
+      setTimeout(_initWelfareMap, 500);
+    }
+    return;
+  }
+
+  _kakaoMapRetryCount = 0;
 
   // 컨테이너 초기 안내 텍스트 제거
   container.innerHTML = '';
+  container.style.display = 'block';
 
   // 기본 좌표: 역삼역 (테헤란로 주변)
   const defaultLoc = new kakao.maps.LatLng(37.5006, 127.0364);
@@ -1267,6 +1286,9 @@ function _initWelfareMap() {
   // 초기 주변 맛집 로드
   window.searchNearbyRestaurants();
 }
+
+// 전역 노출 (복지 탭 클릭 시 수동 호출 가능하게)
+window.initWelfareMap = _initWelfareMap;
 
 window.searchNearbyRestaurants = function() {
   const input = document.getElementById('restaurantSearchInput');
@@ -1363,18 +1385,21 @@ const _patchedInit = function() {
 };
 
 function _initWelfareMapInterceptor() {
-  // 복지 포털 탭 버튼에 이벤트 연결하여 맵 렌더링 보장
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      if (item.getAttribute('data-tab') === 'welfare') {
-        // 지도 엘리먼트 렌더링 속도 보장을 위해 렌더 타이밍 100ms 지연
-        setTimeout(_initWelfareMap, 150);
+  // 이벤트 위임 방식으로 nav-menu 부모에 한 번만 등록 (innerHTML 교체에도 안전)
+  const navMenu = document.querySelector('.nav-menu');
+  if (navMenu && !navMenu._kakaoInterceptorBound) {
+    navMenu._kakaoInterceptorBound = true;
+    navMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('.nav-item');
+      if (item && item.getAttribute('data-tab') === 'welfare') {
+        setTimeout(_initWelfareMap, 200);
       }
     });
-  });
-  
-  // 첫 페이지 진입 시 복지 탭이 활성화되어 있을 경우
-  if (document.getElementById('welfare').classList.contains('active')) {
+  }
+
+  // 현재 복지 탭이 활성 상태인 경우 즉시 초기화 시도
+  const welfareSection = document.getElementById('welfare');
+  if (welfareSection && welfareSection.classList.contains('active')) {
     setTimeout(_initWelfareMap, 300);
   }
 }
