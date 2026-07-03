@@ -150,6 +150,8 @@ function _updateUIForCurrentUser() {
    'profileStyleInput',  user.workStyle  || '',
    'profileEmailInput',  user.email,
    'profilePhoneInput',  user.phone,
+   'profileDeptInput',   user.dept      || '',
+   'profileTitleInput',  user.title     || '',
   ].reduce((_, __, i, arr) => {
     if (i % 2 === 0) {
       const el = document.getElementById(arr[i]);
@@ -676,13 +678,14 @@ function _initProfileEdit() {
   if (form) {
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      if (!AppState.currentUser) return;
       AppState.currentUser.name      = document.getElementById('profileNameInput')?.value   || AppState.currentUser.name;
       AppState.currentUser.status    = document.getElementById('profileStatusInput')?.value || AppState.currentUser.status;
       AppState.currentUser.mbti      = document.getElementById('profileMBTIInput')?.value   || '';
       AppState.currentUser.workStyle = document.getElementById('profileStyleInput')?.value  || '';
       AppState.currentUser.email     = document.getElementById('profileEmailInput')?.value  || AppState.currentUser.email;
       AppState.currentUser.phone     = document.getElementById('profilePhoneInput')?.value  || AppState.currentUser.phone;
+      AppState.currentUser.dept      = document.getElementById('profileDeptInput')?.value   || AppState.currentUser.dept;
+      AppState.currentUser.title     = document.getElementById('profileTitleInput')?.value  || AppState.currentUser.title;
 
       // CloudDB에 업데이트
       const idx = AppState.employees.findIndex(e => e.id === AppState.currentUser.id);
@@ -692,6 +695,29 @@ function _initProfileEdit() {
 
       profileModal?.classList.remove('active');
       _updateUIForCurrentUser();
+      // 조직도가 있을 경우 리렌더링
+      if (window.renderRegistryEvents) {
+        const activeFilter = document.querySelector('.btn-filter.active')?.getAttribute('data-filter') || 'all';
+        const filtered = activeFilter === 'all' ? AppState.employees : AppState.employees.filter(emp => emp.dept === activeFilter);
+        const grid = document.getElementById('directoryGrid');
+        if (grid) {
+          const gradients = [
+            'linear-gradient(135deg,var(--primary),var(--secondary))',
+            'linear-gradient(135deg,var(--secondary),var(--accent))',
+            'linear-gradient(135deg,var(--accent),var(--primary))',
+            'linear-gradient(135deg,var(--success),var(--secondary))',
+          ];
+          grid.innerHTML = filtered.map(emp => `
+            <div class="employee-card glass glass-interactive" onclick="showMemberDetail(${emp.id})">
+              <div class="emp-avatar" style="background:${gradients[emp.id % gradients.length]}">${emp.initial || emp.name[0]}</div>
+              <div>
+                <div style="font-weight:700;font-size:0.95rem;">${emp.name}</div>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px;">${emp.dept} · ${emp.title}</div>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
       window.showToast('✅ 프로필 업데이트', '변경사항이 저장되었습니다.', 'success');
     });
   }

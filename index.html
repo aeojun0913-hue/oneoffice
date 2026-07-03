@@ -1768,15 +1768,21 @@
       <form id="profileEditForm" style="display:flex; flex-direction:column; gap:14px;">
         <div style="text-align:center;">
           <div class="profile-avatar" style="width:80px;height:80px;font-size:2rem;margin:0 auto 10px;" id="modalAvatar">홍</div>
-          <span style="font-size:0.8rem; color:var(--text-muted);">부서/직급은 관리자만 변경 가능합니다.</span>
+          <span style="font-size:0.8rem; color:var(--text-muted);">자유롭게 내 정보와 부서/직급을 수정해보세요.</span>
         </div>
-        <div class="form-group"><label>이름</label><input type="text" class="form-control" id="profileNameInput" required></div>
+        <div class="form-row">
+          <div class="form-group"><label>이름</label><input type="text" class="form-control" id="profileNameInput" required></div>
+          <div class="form-group"><label>이메일</label><input type="email" class="form-control" id="profileEmailInput" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>소속 부서</label><input type="text" class="form-control" id="profileDeptInput" required placeholder="예: 개발팀"></div>
+          <div class="form-group"><label>직급</label><input type="text" class="form-control" id="profileTitleInput" required placeholder="예: 대리"></div>
+        </div>
         <div class="form-group"><label>상태 메시지</label><input type="text" class="form-control" id="profileStatusInput" placeholder="오늘도 화이팅!"></div>
         <div class="form-row">
           <div class="form-group"><label>MBTI</label><input type="text" class="form-control" id="profileMBTIInput" placeholder="예: INTJ"></div>
           <div class="form-group"><label>소통 방식</label><input type="text" class="form-control" id="profileStyleInput" placeholder="예: 텍스트 기반 선호"></div>
         </div>
-        <div class="form-group"><label>이메일</label><input type="email" class="form-control" id="profileEmailInput" required></div>
         <div class="form-group"><label>연락처</label><input type="text" class="form-control" id="profilePhoneInput" required></div>
         <button type="submit" class="btn-primary" style="margin-top:8px;">변경사항 저장</button>
       </form>
