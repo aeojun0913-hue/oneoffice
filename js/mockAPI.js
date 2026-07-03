@@ -220,9 +220,20 @@ window.MockAPI = (() => {
      * AI 생성 (서버 사이드 프록시 — API 키 서버에서만 관리)
      */
     async generateWithAI(prompt) {
+      // 디버그: JWT 토큰 보유 여부 확인
+      const token = getToken();
+      console.log('[AI] JWT 토큰 상태:', token ? `보유 (${token.substring(0, 20)}...)` : '❌ 없음 (로그인 필요)');
+
       const res = await _fetch('/api/ai/generate', 'POST', { prompt });
-      if (res?.text) return res.text;
-      return `[AI 시뮬레이션 응답]\n\n요청: "${prompt.substring(0, 60)}..."\n\n서버에 GEMINI_API_KEY를 .env에 설정하면 실제 AI와 연동됩니다.`;
+      if (res?.text) {
+        console.log('[AI] 서버 AI 응답 성공. 제공자:', res.provider);
+        return res.text;
+      }
+      // res가 null이면 JWT 없음 / 서버 오류 → 에러를 throw해서 catch 블록으로 올림
+      const reason = !token
+        ? '로그인 세션이 없습니다. 먼저 로그인 후 AI 기능을 사용해 주세요.'
+        : 'AI 서버 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+      throw new Error(reason);
     },
 
     /**

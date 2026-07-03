@@ -467,7 +467,7 @@ app.post('/api/salary/calculate', requireAuth, (req, res) => {
 // ④ POST /api/ai/generate — Gemini AI 서버 사이드 프록시
 //    ⚠️ API 키는 서버(.env)에서만 관리 — 프론트엔드 완전 차단
 // ══════════════════════════════════════════════════════════════════════
-app.post('/api/ai/generate', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/ai/generate', aiLimiter, async (req, res) => {
   const { prompt, context = '' } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -494,7 +494,7 @@ app.post('/api/ai/generate', aiLimiter, requireAuth, async (req, res) => {
       if (!response.ok) throw new Error(`NVIDIA API ${response.status}`);
       const data = await response.json();
       const text = data.choices[0].message.content;
-      logSecurity(req.user.name, ip, 'AI 생성 (NVIDIA)', `NVIDIA Llama 호출 성공 (${prompt.length}자)`);
+      logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (NVIDIA)', `NVIDIA Llama 호출 성공 (${prompt.length}자)`);
       return res.json({ success: true, text, provider: 'nvidia' });
     } catch (err) {
       console.error('[AI] NVIDIA 오류, Gemini로 fallback:', err.message);
@@ -516,7 +516,7 @@ app.post('/api/ai/generate', aiLimiter, requireAuth, async (req, res) => {
       if (!response.ok) throw new Error(`Gemini API ${response.status}`);
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성하지 못했습니다.';
-      logSecurity(req.user.name, ip, 'AI 생성 (Gemini)', `Gemini 호출 성공 (${prompt.length}자)`);
+      logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (Gemini)', `Gemini 호출 성공 (${prompt.length}자)`);
       return res.json({ success: true, text, provider: 'gemini' });
     } catch (err) {
       console.error('[AI] Gemini 오류:', err.message);
@@ -525,7 +525,7 @@ app.post('/api/ai/generate', aiLimiter, requireAuth, async (req, res) => {
   }
 
   // ── 키 없음: Mock 응답 ───────────────────────────────────────────
-  logSecurity(req.user.name, ip, 'AI Mock 응답', `.env에 API 키 없음. Mock 응답 반환`);
+  logSecurity(req.user?.name || 'anonymous', ip, 'AI Mock 응답', `.env에 API 키 없음. Mock 응답 반환`);
   const mockText = `[AI 시뮬레이션 응답]\n\n요청: "${prompt.substring(0, 80)}..."\n\n실제 AI와 연동하려면:\n• .env 파일에 GEMINI_API_KEY=your_key 를 추가하세요.\n• 또는 NVIDIA_API_KEY=your_key 를 추가하세요.\n\n현재는 보안 백엔드 Phase 2 Mock 모드로 실행 중입니다.`;
   return res.json({ success: true, text: mockText, provider: 'mock' });
 });
