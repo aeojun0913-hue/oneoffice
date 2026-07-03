@@ -129,35 +129,45 @@ window.MockAPI = (() => {
     fetchDataFromServer: _fetch,
 
     /**
-     * 전체 앱 상태 로드 (서버 우선 → CloudDB fallback)
+     * 전체 앱 상태 로드 (Supabase CloudDB 연동 모드)
      */
     async loadAppState() {
       const serverData = await _fetch('/api/state');
 
       if (serverData) {
-        // 서버 데이터를 CloudDB에 캐시 (오프라인 대비)
-        CloudDB.set('employees',       serverData.employees);
-        CloudDB.set('calendarEvents',  serverData.calendarEvents);
-        CloudDB.set('chatLogs',        serverData.chatLogs);
-        CloudDB.set('welfarePoints',   serverData.welfarePoints);
-        CloudDB.set('fleaMarketItems', serverData.fleaMarketItems);
-        CloudDB.set('registryEvents',  serverData.registryEvents);
-        CloudDB.set('reports',         serverData.reports);
-        CloudDB.set('securityLogs',    serverData.securityLogs);
+        // 서버가 동작 중일 경우 동기화
+        await CloudDB.set('employees',       serverData.employees);
+        await CloudDB.set('calendarEvents',  serverData.calendarEvents);
+        await CloudDB.set('chatLogs',        serverData.chatLogs);
+        await CloudDB.set('welfarePoints',   serverData.welfarePoints);
+        await CloudDB.set('fleaMarketItems', serverData.fleaMarketItems);
+        await CloudDB.set('registryEvents',  serverData.registryEvents);
+        await CloudDB.set('reports',         serverData.reports);
+        await CloudDB.set('securityLogs',    serverData.securityLogs);
         return serverData;
       }
 
-      // 📴 서버 없음 → LocalStorage 클라우드 DB 모드
-      console.info('[MockAPI] 🗄️ LocalStorage CloudDB 모드로 실행 중 (서버 미연결)');
+      // 📴 서버 없음 → Supabase CloudDB 모드 (비동기 데이터 쿼리 대기)
+      console.info('[MockAPI] 🗄️ Supabase CloudDB 모드 활성화 (비동기 연동)');
+      
+      const employees       = await CloudDB.get('employees',       _getDefaultEmployees());
+      const calendarEvents  = await CloudDB.get('calendarEvents',  []);
+      const chatLogs        = await CloudDB.get('chatLogs',        _getDefaultChatLogs());
+      const welfarePoints   = await CloudDB.get('welfarePoints',   { '1':1000000,'2':850000,'3':1200000,'4':1000000,'5':950000,'6':1000000 });
+      const fleaMarketItems = await CloudDB.get('fleaMarketItems', _getDefaultMarketItems());
+      const registryEvents  = await CloudDB.get('registryEvents',  _getDefaultRegistryEvents());
+      const reports         = await CloudDB.get('reports',         []);
+      const securityLogs    = await CloudDB.get('securityLogs',    []);
+
       return {
-        employees:       CloudDB.get('employees',       _getDefaultEmployees()),
-        calendarEvents:  CloudDB.get('calendarEvents',  []),
-        chatLogs:        CloudDB.get('chatLogs',        _getDefaultChatLogs()),
-        welfarePoints:   CloudDB.get('welfarePoints',   { '1':150000,'2':120000,'3':95000,'4':52000,'5':30000,'6':45000 }),
-        fleaMarketItems: CloudDB.get('fleaMarketItems', _getDefaultMarketItems()),
-        registryEvents:  CloudDB.get('registryEvents',  _getDefaultRegistryEvents()),
-        reports:         CloudDB.get('reports',         []),
-        securityLogs:    CloudDB.get('securityLogs',    []),
+        employees,
+        calendarEvents,
+        chatLogs,
+        welfarePoints,
+        fleaMarketItems,
+        registryEvents,
+        reports,
+        securityLogs
       };
     },
 

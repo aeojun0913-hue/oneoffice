@@ -1,116 +1,168 @@
 /**
- * ☁️ cloudDB.js — SaaS 핵심 모듈 1: LocalStorage 클라우드 DB 추상화
+ * ☁️ cloudDB.js — SaaS 핵심 모듈 1: Supabase 클라우드 DB 연동
  *
- * 목적: 브라우저의 LocalStorage를 임시 클라우드 DB로 활용하여
- *       새로고침/창닫기 후에도 데이터를 100% 보존합니다.
- *       테넌트별 네임스페이스 분리로 멀티테넌트 SaaS 구조를 시뮬레이션합니다.
- *
- * 사용법:
- *   CloudDB.get('employees')          → 직원 배열 읽기
- *   CloudDB.set('employees', [...])   → 저장
- *   CloudDB.push('calendarEvents', {})→ 배열에 항목 추가
- *
- * 클라우드 배포 시:
- *   이 모듈을 실제 Firestore/DynamoDB SDK로 교체하면 됩니다.
- *   인터페이스(API 시그니처)는 그대로 유지됩니다.
+ * 목적: LocalStorage 저장 방식에서 진짜 AWS 호스팅 Supabase (PostgreSQL)
+ *       클라우드 데이터베이스와 실시간으로 데이터를 동기화합니다.
  */
 
 window.CloudDB = (() => {
-  // ── 테넌트 설정 (SaaS 멀티테넌트 시뮬레이션) ──────────────────────
-  const TENANT_ID = 'ANTIGRAVITY'; // 🏢 회사(테넌트) 고유 식별자
-  const VERSION   = 'v1';          // 스키마 버전 (마이그레이션 대비)
+  const SUBAPASE_URL = 'https://nnebupmxmbrjmxsnvstj.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uZWJ1cG14bWJyam14c252c3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5Nzc3ODgsImV4cCI6MjA5ODU1Mzc4OH0.NsYIxdXtdKoCTKKcDsCuJyR8uTU-T1oh4Ht3kQmz6WM';
 
-  /** 컬렉션명 → LocalStorage 키 변환 */
-  function _key(collection) {
-    return `oneoffice_${TENANT_ID}_${VERSION}_${collection}`;
+  // Supabase 클라이언트 초기화
+  let supabase = null;
+  if (window.supabase && window.supabase.createClient) {
+    supabase = window.supabase.createClient(SUBAPASE_URL, SUPABASE_KEY);
+  } else {
+    console.error('[CloudDB] Supabase SDK가 아직 로드되지 않았습니다.');
   }
 
-  /** 현재 타임스탬프 ISO 문자열 */
-  function _now() {
-    return new Date().toISOString();
-  }
+  // LocalStorage 호환을 위한 매핑 정보
+  const TABLE_MAP = {
+    'employees': 'employees',
+    'welfarePoints': 'welfare_points',
+    'chatLogs': 'chat_logs',
+    'registryEvents': 'registry_events',
+    'fleaMarketItems': 'flea_market_items',
+    'reports': 'reports',
+    'securityLogs': 'security_logs'
+  };
 
   return {
-    // ── Read ──────────────────────────────────────────────────────────
-    get(collection, defaultValue = null) {
+    client: supabase,
+
+    // ── Read (실시간 비동기 조회) ────────────────────────────────────
+    async get(collection, defaultValue = null) {
+      if (!supabase) return defaultValue;
+      const table = TABLE_MAP[collection];
+      if (!table) return defaultValue;
+
       try {
-        const raw = localStorage.getItem(_key(collection));
-        return raw !== null ? JSON.parse(raw) : defaultValue;
+        const { data, error } = await supabase
+          .from(table)
+          .select('*');
+
+        if (error) throw error;
+
+        // welfarePoints의 경우 { "1": 1000000, "2": 850000 } 포맷으로 가공
+        if (collection === 'welfarePoints') {
+          const formatted = {};
+          data.forEach(row => {
+            formatted[String(row.user_id)] = row.balance;
+          });
+          return formatted;
+        }
+
+        // chatLogs의 경우 target별로 그룹핑하여 { group: [], bot: [] } 포맷 제공
+        if (collection === 'chatLogs') {
+          const formatted = {};
+          data.forEach(row => {
+            if (!formatted[row.target]) formatted[row.target] = [];
+            formatted[row.target].push({
+              sender: row.sender,
+              senderName: row.sender_name,
+              text: row.text
+            });
+          });
+          return formatted;
+        }
+
+        // 일반 배열 반환 (ID 정렬)
+        return data.sort((a, b) => a.id - b.id) || defaultValue;
       } catch (e) {
-        console.warn(`[CloudDB] get("${collection}") 파싱 실패:`, e);
+        console.warn(`[Supabase Read Error] ${collection}:`, e);
         return defaultValue;
       }
     },
 
-    // ── Write ─────────────────────────────────────────────────────────
-    set(collection, data) {
+    // ── Write / Update (단일 데이터 추가/수정) ────────────────────────
+    async set(collection, data) {
+      if (!supabase) return false;
+      const table = TABLE_MAP[collection];
+      if (!table) return false;
+
       try {
-        localStorage.setItem(_key(collection), JSON.stringify(data));
-        return true;
+        // 복지 포인트 일괄 업데이트 처리
+        if (collection === 'welfarePoints') {
+          const promises = Object.entries(data).map(([userId, balance]) => {
+            return supabase
+              .from('welfare_points')
+              .upsert({ user_id: Number(userId), balance });
+          });
+          await Promise.all(promises);
+          return true;
+        }
+
+        // 일반 배열 저장
+        if (Array.isArray(data)) {
+          const promises = data.map(item => {
+            const row = { ...item };
+            // 객체 Key 포맷 변환 (camelCase -> snake_case)
+            if (row.joinDate !== undefined) { row.join_date = row.joinDate; delete row.joinDate; }
+            if (row.workStyle !== undefined) { row.work_style = row.workStyle; delete row.workStyle; }
+            if (row.employeeId !== undefined) { row.employee_id = row.employeeId; delete row.employeeId; }
+            if (row.employeeName !== undefined) { row.employee_name = row.employeeName; delete row.employeeName; }
+            if (row.eventTitle !== undefined) { row.event_title = row.eventTitle; delete row.eventTitle; }
+            if (row.isToday !== undefined) { row.is_today = row.isToday; delete row.isToday; }
+            if (row.sellerId !== undefined) { row.seller_id = row.sellerId; delete row.sellerId; }
+            if (row.sellerName !== undefined) { row.seller_name = row.sellerName; delete row.sellerName; }
+            return supabase.from(table).upsert(row);
+          });
+          await Promise.all(promises);
+          return true;
+        }
+
+        return false;
       } catch (e) {
-        console.error(`[CloudDB] set("${collection}") 저장 실패 (용량 초과?):`, e);
+        console.error(`[Supabase Write Error] ${collection}:`, e);
         return false;
       }
     },
 
-    merge(collection, updates) {
-      const existing = this.get(collection, {});
-      return this.set(collection, { ...existing, ...updates });
+    // ── Array push (데이터 즉시 insert) ─────────────────────────────
+    async push(collection, item) {
+      if (!supabase) return false;
+      const table = TABLE_MAP[collection];
+      if (!table) return false;
+
+      try {
+        const row = { ...item };
+        // camelCase -> snake_case 키 변환
+        if (row.senderName) { row.sender_name = row.senderName; delete row.senderName; }
+        if (row.employeeId) { row.employee_id = row.employeeId; delete row.employeeId; }
+        if (row.employeeName) { row.employee_name = row.employeeName; delete row.employeeName; }
+        if (row.eventTitle) { row.event_title = row.eventTitle; delete row.eventTitle; }
+        if (row.isToday !== undefined) { row.is_today = row.isToday; delete row.isToday; }
+        if (row.sellerId) { row.seller_id = row.sellerId; delete row.sellerId; }
+        if (row.sellerName) { row.seller_name = row.sellerName; delete row.sellerName; }
+
+        const { error } = await supabase.from(table).insert(row);
+        if (error) throw error;
+        return true;
+      } catch (e) {
+        console.error(`[Supabase Push Error] ${collection}:`, e);
+        return false;
+      }
     },
 
-    // ── Array Operations ───────────────────────────────────────────────
-    push(collection, item) {
-      const arr = this.get(collection, []);
-      arr.push(item);
-      return this.set(collection, arr);
-    },
+    // ── 데이터 삭제 ─────────────────────────────────────────────────
+    async remove(collection, id) {
+      if (!supabase) return false;
+      const table = TABLE_MAP[collection];
+      if (!table) return false;
 
-    prepend(collection, item) {
-      const arr = this.get(collection, []);
-      arr.unshift(item);
-      return this.set(collection, arr);
-    },
+      try {
+        const { error } = await supabase
+          .from(table)
+          .delete()
+          .eq('id', id);
 
-    remove(collection, id) {
-      const arr = this.get(collection, []);
-      return this.set(collection, arr.filter(i => String(i.id) !== String(id)));
-    },
-
-    update(collection, id, updates) {
-      const arr = this.get(collection, []);
-      const idx = arr.findIndex(i => String(i.id) === String(id));
-      if (idx === -1) return false;
-      arr[idx] = { ...arr[idx], ...updates, updatedAt: _now() };
-      return this.set(collection, arr);
-    },
-
-    // ── Tenant Management ──────────────────────────────────────────────
-    clearTenant() {
-      const prefix = `oneoffice_${TENANT_ID}_`;
-      Object.keys(localStorage)
-        .filter(k => k.startsWith(prefix))
-        .forEach(k => localStorage.removeItem(k));
-      console.info(`[CloudDB] 테넌트 ${TENANT_ID} 데이터 초기화 완료`);
-    },
-
-    listKeys() {
-      const prefix = `oneoffice_${TENANT_ID}_${VERSION}_`;
-      return Object.keys(localStorage)
-        .filter(k => k.startsWith(prefix))
-        .map(k => k.replace(prefix, ''));
-    },
-
-    debug() {
-      const keys = this.listKeys();
-      console.group(`[CloudDB] 테넌트: ${TENANT_ID} | 저장된 컬렉션: ${keys.length}개`);
-      keys.forEach(key => {
-        const val = this.get(key);
-        console.log(`  ${key}:`, Array.isArray(val) ? `[Array(${val.length})]` : val);
-      });
-      console.groupEnd();
-    },
-
-    TENANT_ID,
-    VERSION,
+        if (error) throw error;
+        return true;
+      } catch (e) {
+        console.error(`[Supabase Delete Error] ${collection}:`, e);
+        return false;
+      }
+    }
   };
 })();
