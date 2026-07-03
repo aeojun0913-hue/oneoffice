@@ -1231,6 +1231,122 @@ window.renderMarketItems = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
+// 🗺️ 카카오맵 연동 및 주변 맛집 검색
+// ═══════════════════════════════════════════════════════════════════════
+let kakaoMapInstance = null;
+let kakaoMapMarkers  = [];
+
+function _initWelfareMap() {
+  const container = document.getElementById('kakaoMapContainer');
+  if (!container || !window.kakao || !window.kakao.maps) return;
+
+  // 컨테이너 초기 안내 텍스트 제거
+  container.innerHTML = '';
+
+  // 기본 좌표: 역삼역 (테헤란로 주변)
+  const defaultLoc = new kakao.maps.LatLng(37.5006, 127.0364);
+
+  const options = {
+    center: defaultLoc,
+    level: 3
+  };
+
+  kakaoMapInstance = new kakao.maps.Map(container, options);
+
+  // 기본 마커 (회사 위치)
+  const companyMarker = new kakao.maps.Marker({
+    position: defaultLoc,
+    map: kakaoMapInstance
+  });
+
+  const infowindow = new kakao.maps.InfoWindow({
+    content: '<div style="padding:5px;color:#000;font-size:0.75rem;font-weight:700;">🏢 Antigravity Secure Hub</div>'
+  });
+  infowindow.open(kakaoMapInstance, companyMarker);
+
+  // 초기 주변 맛집 로드
+  window.searchNearbyRestaurants();
+}
+
+window.searchNearbyRestaurants = function() {
+  const input = document.getElementById('restaurantSearchInput');
+  const keyword = input?.value.trim() || '맛집';
+  const listContainer = document.getElementById('nearbyRestaurantList');
+
+  if (!kakaoMapInstance || !window.kakao || !window.kakao.maps) return;
+
+  // 기존 마커 제거
+  kakaoMapMarkers.forEach(m => m.setMap(null));
+  kakaoMapMarkers = [];
+
+  // 카카오맵 장소 검색 서비스
+  const ps = new kakao.maps.services.Places();
+
+  ps.keywordSearch(keyword, (data, status, pagination) => {
+    if (status === kakao.maps.services.Status.OK) {
+      const bounds = new kakao.maps.LatLngBounds();
+      
+      // 검색된 음식점 리스트 생성
+      let html = '';
+      
+      data.slice(0, 5).forEach((place, idx) => {
+        const coords = new kakao.maps.LatLng(place.y, place.x);
+        bounds.extend(coords);
+
+        // 지도 마커 생성
+        const marker = new kakao.maps.Marker({
+          position: coords,
+          map: kakaoMapInstance
+        });
+        
+        kakaoMapMarkers.push(marker);
+
+        // 마커 클릭 시 정보 노출
+        const iw = new kakao.maps.InfoWindow({
+          content: `<div style="padding:5px;color:#000;font-size:0.75rem;font-weight:700;">${place.place_name}</div>`
+        });
+        
+        kakao.maps.event.addListener(marker, 'click', () => {
+          iw.open(kakaoMapInstance, marker);
+        });
+
+        // 리스트 카드 마크업 생성
+        const icons = ['🍚', '🍜', '☕', '🍔', '🥗', '🍕'];
+        const icon  = icons[idx % icons.length];
+        
+        html += `
+          <div class="welfare-benefit-card" onclick="window.focusOnMapPlace(${place.y}, ${place.x}, '${place.place_name}')" style="cursor:pointer;">
+            <div class="welfare-benefit-icon">${icon}</div>
+            <div class="welfare-benefit-info">
+              <div class="welfare-benefit-name">${place.place_name}</div>
+              <div class="welfare-benefit-desc">${place.category_group_name || '음식점'} · ${place.road_address_name || place.address_name} · 📞${place.phone || '번호 없음'}</div>
+            </div>
+            <span class="welfare-benefit-badge" style="background:var(--secondary);color:white;">이동</span>
+          </div>`;
+      });
+
+      if (listContainer) listContainer.innerHTML = html;
+      kakaoMapInstance.setBounds(bounds);
+    } else {
+      if (listContainer) listContainer.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.8rem;padding:20px;">검색 결과가 없습니다. 다른 키워드로 검색해보세요.</div>`;
+    }
+  }, {
+    location: kakaoMapInstance.getCenter(),
+    radius: 1000
+  });
+};
+
+window.focusOnMapPlace = function(y, x, name) {
+  if (!kakaoMapInstance) return;
+  const coords = new kakao.maps.LatLng(y, x);
+  kakaoMapInstance.setCenter(coords);
+  kakaoMapInstance.setLevel(2);
+  
+  // 알림 토스트
+  window.showToast?.('📍 맛집 위치', `'${name}' 위치로 지도를 이동했습니다.`, 'info');
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // 🔄 _initAllFeatures 확장 — 새 기능 추가 init
 // ═══════════════════════════════════════════════════════════════════════
 const _origInitAllFeatures = _initAllFeatures;
@@ -1241,7 +1357,27 @@ const _patchedInit = function() {
   // 업무보고 탭에 템플릿 버튼 삽입
   _injectReportTemplateButtons();
   _renderMyEventsList();
+  
+  // 카카오맵 탭 진입 감지용 인터셉터 추가
+  _initWelfareMapInterceptor();
 };
+
+function _initWelfareMapInterceptor() {
+  // 복지 포털 탭 버튼에 이벤트 연결하여 맵 렌더링 보장
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      if (item.getAttribute('data-tab') === 'welfare') {
+        // 지도 엘리먼트 렌더링 속도 보장을 위해 렌더 타이밍 100ms 지연
+        setTimeout(_initWelfareMap, 150);
+      }
+    });
+  });
+  
+  // 첫 페이지 진입 시 복지 탭이 활성화되어 있을 경우
+  if (document.getElementById('welfare').classList.contains('active')) {
+    setTimeout(_initWelfareMap, 300);
+  }
+}
 
 function _injectReportTemplateButtons() {
   const form = document.getElementById('submitReportBtn')?.parentElement;
