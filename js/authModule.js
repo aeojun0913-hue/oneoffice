@@ -103,30 +103,30 @@ window.AuthModule = (() => {
   }
 
   // ── 보안 로그 기록 ───────────────────────────────────────────────
-  function _logSecurity(userName, action, detail, ip = 'Browser-Session') {
-    const logs = CloudDB.get('securityLogs', []);
+  async function _logSecurity(userName, action, detail, ip = 'Browser-Session') {
+    const logs = await CloudDB.get('securityLogs', []);
     logs.unshift({ timestamp: new Date().toISOString(), userName, ip, action, detail });
-    CloudDB.set('securityLogs', logs);
+    await CloudDB.set('securityLogs', logs);
     if (window.AppState) window.AppState.securityLogs = logs;
   }
 
   // ── 세션 관리 ────────────────────────────────────────────────────
-  function saveSession(user, role) {
-    const session = { userId: user.id, userName: user.name, role, tenantId: CloudDB.TENANT_ID, loginAt: new Date().toISOString() };
-    CloudDB.set('currentSession', session);
+  async function saveSession(user, role) {
+    const session = { userId: user.id, userName: user.name, role, tenantId: 'ANTIGRAVITY', loginAt: new Date().toISOString() };
+    await CloudDB.set('currentSession', session);
     localStorage.setItem('ex_logged_user', JSON.stringify(user));
     localStorage.setItem('oneoffice_current_role', role);
-    _logSecurity(user.name, '로그인 완료', `[${role.toUpperCase()}] ${user.name}님 로그인 성공 (테넌트: ${CloudDB.TENANT_ID})`);
+    await _logSecurity(user.name, '로그인 완료', `[${role.toUpperCase()}] ${user.name}님 로그인 성공`);
   }
 
-  function getSession() {
-    return CloudDB.get('currentSession');
+  async function getSession() {
+    return await CloudDB.get('currentSession');
   }
 
-  function clearSession() {
-    const session = getSession();
-    if (session) _logSecurity(session.userName || 'Unknown', '로그아웃', '정상 로그아웃 처리');
-    CloudDB.set('currentSession', null);
+  async function clearSession() {
+    const session = await getSession();
+    if (session) await _logSecurity(session.userName || 'Unknown', '로그아웃', '정상 로그아웃 처리');
+    await CloudDB.set('currentSession', null);
     localStorage.removeItem('ex_logged_user');
     localStorage.removeItem('oneoffice_current_role');
   }
@@ -205,8 +205,8 @@ window.AuthModule = (() => {
         _otp = res.otpHint;
         if (window.showSecurityOTPToast) window.showSecurityOTPToast(_otp);
       } else {
-        // LocalStorage 모드: 직원 목록에서 이메일 검색
-        const employees = CloudDB.get('employees', MockAPI.getDefaultEmployees());
+        // LocalStorage 모드: 직원 목록에서 이메일 검색 (비동기 대기 추가)
+        const employees = await CloudDB.get('employees', MockAPI.getDefaultEmployees());
         const emp = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
         if (!emp) { setError('이메일이 올바르지 않습니다.'); return; }
         // Mock OTP 생성 (6자리 랜덤)
@@ -250,14 +250,14 @@ window.AuthModule = (() => {
       } else {
         // 📴 LocalStorage 모드: OTP 검증
         if (otp !== _otp) { setError('보안코드가 일치하지 않습니다. 상단 OTP 알림을 참고하세요.'); return; }
-        const employees = CloudDB.get('employees', MockAPI.getDefaultEmployees());
+        const employees = await CloudDB.get('employees', MockAPI.getDefaultEmployees());
         employee = employees.find(e => e.email.toLowerCase() === _pendingEmail.toLowerCase());
         if (!employee) { setError('사용자를 찾을 수 없습니다.'); return; }
       }
 
       // 로그인 성공 처리
       _currentRole = _pendingRole;
-      saveSession(employee, _currentRole);
+      await saveSession(employee, _currentRole);
 
       if (loginOverlay) loginOverlay.classList.remove('active');
       clearError();
@@ -314,13 +314,13 @@ window.AuthModule = (() => {
      * 저장된 세션으로 자동 로그인 복원
      * @returns {object|null} 복원된 직원 객체 또는 null
      */
-    restoreSession() {
+    async restoreSession() {
       const savedStr = localStorage.getItem('ex_logged_user');
       const savedRole = localStorage.getItem('oneoffice_current_role') || 'employee';
       if (!savedStr) return null;
       try {
         const parsed = JSON.parse(savedStr);
-        const employees = CloudDB.get('employees', MockAPI.getDefaultEmployees());
+        const employees = await CloudDB.get('employees', MockAPI.getDefaultEmployees());
         const employee = employees.find(e => e.id === parsed.id) || parsed;
         _currentRole = savedRole;
         renderNavMenu(_currentRole);

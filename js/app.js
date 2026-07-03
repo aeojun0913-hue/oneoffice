@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── 3. AuthModule 초기화 (로그인 UI + 세션 복원) ──────────────────
   AuthModule.init();
 
-  const restored = AuthModule.restoreSession();
+  const restored = await AuthModule.restoreSession();
   if (restored) {
     // 세션 복원 성공 → 대시보드 바로 표시
     AppState.currentUser = restored.employee;
