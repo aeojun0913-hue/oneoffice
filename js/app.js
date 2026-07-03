@@ -926,8 +926,13 @@ function _initAIOffice() {
 발표 내용: ${content}`;
 
         const aiText = await MockAPI.generateWithAI(prompt);
-        // JSON 파싱 시도 (백틱 기호 제거 등 보완)
-        const cleanJSON = aiText.replace(/```json|```/g, '').trim();
+        // JSON 추출 강화 (앞뒤로 텍스트가 섞여 있어도 대괄호 배열 영역만 추출)
+        const startIdx = aiText.indexOf('[');
+        const endIdx = aiText.lastIndexOf(']') + 1;
+        if (startIdx === -1 || endIdx === -1) {
+          throw new Error('정상적인 슬라이드 JSON 배열이 포함되어 있지 않습니다.');
+        }
+        const cleanJSON = aiText.substring(startIdx, endIdx);
         const slides = JSON.parse(cleanJSON);
 
         let slidesHTML = '';
