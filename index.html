@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
@@ -64,22 +64,34 @@
     .mood-btn:hover { background: rgba(99,102,241,0.1); border-color: var(--primary); transform: scale(1.1); }
 
     /* ===== SIDEBAR ===== */
-    .sidebar { width: var(--sidebar-width); height: 100%; padding: 24px; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); z-index: 10; flex-shrink: 0; }
-    .logo-container { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+    .sidebar { width: var(--sidebar-width); height: 100%; padding: 20px 16px; display: flex; flex-direction: column; border-right: 1px solid var(--border-color); z-index: 10; flex-shrink: 0; overflow-y: auto; }
+    .logo-container { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding: 0 8px; }
     .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--primary), var(--secondary)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; box-shadow: 0 0 15px var(--primary-glow); font-size: 1.2rem; }
     .logo-text { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px; background: linear-gradient(to right, #fff, #9ca3af); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 4px; flex-grow: 1; }
-    .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; color: var(--text-muted); text-decoration: none; font-weight: 500; cursor: pointer; transition: all 0.2s ease; font-size: 0.92rem; }
-    .nav-item i { font-size: 1.1rem; width: 20px; text-align: center; }
+    .nav-menu { list-style: none; display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+    .nav-group-label { font-size: 0.65rem; font-weight: 700; color: var(--text-dark); text-transform: uppercase; letter-spacing: 1.2px; padding: 10px 14px 4px; margin-top: 6px; }
+    .nav-divider { height: 1px; background: var(--border-color); margin: 8px 0; opacity: 0.5; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; color: var(--text-muted); text-decoration: none; font-weight: 500; cursor: pointer; transition: all 0.2s ease; font-size: 0.88rem; }
+    .nav-item i { font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; }
     .nav-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
-    .nav-item.active { color: #fff; background: linear-gradient(90deg, rgba(99,102,241,0.15), rgba(6,182,212,0.05)); border-left: 3px solid var(--primary); padding-left: 11px; }
-    .nav-badge { margin-left: auto; background: var(--primary); color: white; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 20px; letter-spacing: 0.5px; }
+    .nav-item.active { color: #fff; background: linear-gradient(90deg, rgba(99,102,241,0.18), rgba(6,182,212,0.05)); border-left: 3px solid var(--primary); padding-left: 9px; }
+    .nav-badge { margin-left: auto; background: var(--primary); color: white; font-size: 0.58rem; font-weight: 700; padding: 2px 5px; border-radius: 20px; letter-spacing: 0.5px; flex-shrink: 0; }
     .user-profile-menu { margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; }
     .user-profile-menu:hover { background: rgba(255,255,255,0.05); }
     .profile-avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--secondary), var(--accent)); display: flex; align-items: center; justify-content: center; font-weight: 600; color: white; border: 2px solid rgba(255,255,255,0.1); flex-shrink: 0; }
     .profile-info { display: flex; flex-direction: column; overflow: hidden; }
     .profile-name { font-size: 0.9rem; font-weight: 600; color: white; }
     .profile-role { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+    /* DM Slide Panel */
+    .dm-panel { position: fixed; top: 0; right: -400px; width: 380px; height: 100vh; background: rgba(19,23,34,0.97); backdrop-filter: blur(20px); border-left: 1px solid var(--border-color); z-index: 200; display: flex; flex-direction: column; transition: right 0.35s cubic-bezier(0.4,0,0.2,1); box-shadow: -8px 0 30px rgba(0,0,0,0.4); }
+    .dm-panel.open { right: 0; }
+    .dm-panel-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 12px; }
+    .dm-panel-body { flex-grow: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .dm-panel-footer { padding: 14px 16px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; }
+    /* Floating Messenger Bubble */
+    .messenger-fab { position: fixed; bottom: 100px; right: 30px; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--secondary), var(--primary)); color: white; border: none; font-size: 1.2rem; cursor: pointer; box-shadow: 0 6px 20px rgba(6,182,212,0.4); transition: transform 0.3s; display: flex; align-items: center; justify-content: center; z-index: 998; }
+    .messenger-fab:hover { transform: scale(1.1); }
+    .messenger-fab .fab-badge { position: absolute; top: -3px; right: -3px; width: 18px; height: 18px; background: var(--danger); border-radius: 50%; font-size: 0.6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-primary); }
 
     /* ===== MAIN CONTENT ===== */
     .main-content { flex-grow: 1; height: 100%; overflow-y: auto; padding: 36px 40px; display: flex; flex-direction: column; position: relative; }
@@ -492,17 +504,37 @@
       <div class="logo-text">OneOffice</div>
     </div>
     <nav class="nav-menu">
+      <!-- 홈 -->
+      <div class="nav-group-label">홈</div>
       <a class="nav-item active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i><span>대시보드</span></a>
-      <a class="nav-item" data-tab="calendar"><i class="fa-solid fa-calendar-days"></i><span>업무 캘린더</span></a>
-      <a class="nav-item" data-tab="directory"><i class="fa-solid fa-sitemap"></i><span>조직도 &amp; 구성원</span></a>
-      <a class="nav-item" data-tab="payroll"><i class="fa-solid fa-wallet"></i><span>지갑 메이트</span></a>
-      <a class="nav-item" data-tab="aioffice"><i class="fa-solid fa-wand-magic-sparkles"></i><span>AI 오피스</span><span class="nav-badge">NEW</span></a>
-      <a class="nav-item" data-tab="welfare"><i class="fa-solid fa-gift"></i><span>복지 포털</span><span class="nav-badge" style="background:var(--success);">HOT</span></a>
-      <a class="nav-item" data-tab="approval"><i class="fa-solid fa-file-circle-check"></i><span>결재 &amp; 문서</span></a>
-      <a class="nav-item" data-tab="hrmanage"><i class="fa-solid fa-shield-halved"></i><span>HR 관리</span><span class="nav-badge" style="background:var(--danger);">NEW</span></a>
-      <a class="nav-item" data-tab="expense"><i class="fa-solid fa-receipt"></i><span>경비 &amp; 자산</span></a>
-      <a class="nav-item" data-tab="reports"><i class="fa-solid fa-file-invoice"></i><span>업무 보고</span></a>
+
+      <!-- 소통 -->
+      <div class="nav-divider"></div>
+      <div class="nav-group-label">소통</div>
       <a class="nav-item" data-tab="messenger"><i class="fa-solid fa-comments"></i><span>메신저</span></a>
+      <a class="nav-item" data-tab="directory"><i class="fa-solid fa-sitemap"></i><span>조직도 &amp; 구성원</span></a>
+
+      <!-- 업무 -->
+      <div class="nav-divider"></div>
+      <div class="nav-group-label">업무</div>
+      <a class="nav-item" data-tab="calendar"><i class="fa-solid fa-calendar-days"></i><span>업무 캘린더</span></a>
+      <a class="nav-item" data-tab="reports"><i class="fa-solid fa-file-invoice"></i><span>업무 보고</span></a>
+      <a class="nav-item" data-tab="approval"><i class="fa-solid fa-file-circle-check"></i><span>결재 &amp; 문서</span></a>
+      <a class="nav-item" data-tab="expense"><i class="fa-solid fa-receipt"></i><span>경비 &amp; 정산</span></a>
+
+      <!-- 급여 / 복지 -->
+      <div class="nav-divider"></div>
+      <div class="nav-group-label">급여 / 복지</div>
+      <a class="nav-item" data-tab="payroll"><i class="fa-solid fa-wallet"></i><span>급여 시스템</span></a>
+      <a class="nav-item" data-tab="welfare"><i class="fa-solid fa-gift"></i><span>복지 포털</span><span class="nav-badge" style="background:var(--success);">HOT</span></a>
+      <a class="nav-item" data-tab="fleamarket"><i class="fa-solid fa-store"></i><span>사내 플리마켓</span></a>
+      <a class="nav-item" data-tab="registry"><i class="fa-solid fa-heart"></i><span>경조사</span></a>
+
+      <!-- AI / 관리 -->
+      <div class="nav-divider"></div>
+      <div class="nav-group-label">AI / 관리</div>
+      <a class="nav-item" data-tab="aioffice"><i class="fa-solid fa-wand-magic-sparkles"></i><span>AI 워크스페이스</span><span class="nav-badge">NEW</span></a>
+      <a class="nav-item" data-tab="hrmanage"><i class="fa-solid fa-shield-halved"></i><span>HR 관리</span></a>
     </nav>
     <div class="user-profile-menu" id="currentUserBtn">
       <div class="profile-avatar" id="currentUserAvatar">홍</div>
@@ -673,17 +705,35 @@
               <div class="current-month" id="calendarMonthYear">2026년 7월</div>
               <button class="btn-nav" id="nextMonthBtn"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
+            <div style="font-size:0.78rem;color:var(--text-muted);">캘린더 클릭 → 날짜 자동 입력</div>
           </div>
           <div class="calendar-grid" id="calendarGrid"></div>
         </div>
         <div class="leave-sidebar glass">
-          <h3 class="card-title"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> 연차/일정 신청</h3>
+          <h3 class="card-title"><i class="fa-solid fa-pen-to-square" style="color:var(--primary);"></i> 업무 일정 신청</h3>
           <form id="leaveRequestForm" style="display:flex; flex-direction:column; gap:14px; margin-top: 16px;">
             <div class="form-group">
               <label>신청 종류</label>
               <select class="form-control" id="leaveType">
-                <option value="연차">연차 휴가</option><option value="반차">반차 휴가</option>
-                <option value="병가">병가</option><option value="미팅">업무 미팅</option><option value="기타">공식 일정</option>
+                <optgroup label="🏖️ 휴가류">
+                  <option value="연차">연차 휴가 (1일)</option>
+                  <option value="오전반차">오전 반차 (0.5일)</option>
+                  <option value="오후반차">오후 반차 (0.5일)</option>
+                  <option value="병가">병가</option>
+                  <option value="경조사휴가">경조사 휴가</option>
+                  <option value="공가">공가 (공무상 출석)</option>
+                  <option value="대체휴무">대체 휴무</option>
+                </optgroup>
+                <optgroup label="🏢 근무 유형">
+                  <option value="재택근무">재택근무</option>
+                  <option value="출장">출장</option>
+                  <option value="외근">외근</option>
+                </optgroup>
+                <optgroup label="📋 기타 일정">
+                  <option value="업무미팅">업무 미팅</option>
+                  <option value="교육">교육/세미나</option>
+                  <option value="기타">기타 공식 일정</option>
+                </optgroup>
               </select>
             </div>
             <div class="form-row">
@@ -691,14 +741,56 @@
               <div class="form-group"><label>종료일</label><input type="date" class="form-control" id="leaveEnd"></div>
             </div>
             <div class="form-group">
-              <label>사유</label>
-              <textarea class="form-control" id="leaveReason" rows="3" placeholder="사유를 입력해주세요."></textarea>
+              <label>사유 / 메모</label>
+              <textarea class="form-control" id="leaveReason" rows="3" placeholder="사유나 메모를 입력해주세요."></textarea>
             </div>
-            <button type="submit" class="btn-primary">신청하기 (결재 요청)</button>
+            <button type="submit" class="btn-primary"><i class="fa-solid fa-paper-plane"></i> 신청하기 (결재 요청)</button>
           </form>
+
+          <!-- 등록된 내 일정 목록 -->
+          <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
+            <div style="font-size:0.82rem; font-weight:600; color:var(--text-muted); margin-bottom:10px;">📅 내 최근 일정</div>
+            <div id="myEventsList" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;"></div>
+          </div>
         </div>
       </div>
     </section>
+
+    <!-- 이벤트 수정/삭제 모달 -->
+    <div class="modal-overlay" id="eventEditModal">
+      <div class="modal-content glass" style="max-width:420px;">
+        <div class="modal-header">
+          <h3 style="font-size:1.1rem;font-weight:700;"><i class="fa-solid fa-calendar-pen" style="color:var(--primary);"></i> 일정 수정</h3>
+          <button class="modal-close" id="eventEditClose">&times;</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <input type="hidden" id="editEventId">
+          <div class="form-group">
+            <label>신청 종류</label>
+            <select class="form-control" id="editLeaveType">
+              <option value="연차">연차 휴가</option><option value="오전반차">오전 반차</option>
+              <option value="오후반차">오후 반차</option><option value="병가">병가</option>
+              <option value="경조사휴가">경조사 휴가</option><option value="공가">공가</option>
+              <option value="대체휴무">대체 휴무</option><option value="재택근무">재택근무</option>
+              <option value="출장">출장</option><option value="외근">외근</option>
+              <option value="업무미팅">업무 미팅</option><option value="기타">기타</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>시작일</label><input type="date" class="form-control" id="editLeaveStart"></div>
+            <div class="form-group"><label>종료일</label><input type="date" class="form-control" id="editLeaveEnd"></div>
+          </div>
+          <div class="form-group">
+            <label>사유</label>
+            <textarea class="form-control" id="editLeaveReason" rows="2"></textarea>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn-primary" style="flex:2;" id="btnSaveEventEdit"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+            <button class="btn-secondary" style="flex:1;background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.3);color:var(--danger);" id="btnDeleteEvent"><i class="fa-solid fa-trash"></i> 삭제</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- ===== TAB: DIRECTORY ===== -->
     <section class="tab-content" id="directory">
@@ -733,16 +825,25 @@
       </div>
     </section>
 
-    <!-- ===== TAB: PAYROLL / 지갑 메이트 (월 350만원 기본값 설정) ===== -->
+    <!-- ===== TAB: PAYROLL / 급여 시스템 ===== -->
     <section class="tab-content" id="payroll">
       <div class="payroll-layout">
         <div class="simulator-card glass">
-          <h2 class="payroll-title">💰 지갑 메이트 — 실시간 급여 계산기</h2>
-          <p style="color:var(--text-muted); font-size:0.88rem; margin-bottom:16px;">대한민국 평균 월급(세전 350만 원) 기준 공제율 자동 계산기가 연동되어 있습니다.</p>
-          <div class="slider-group">
-            <div class="slider-header"><span class="slider-label">기본 월급 (세전)</span><span class="slider-value" id="baseSalaryVal">3,500,000원</span></div>
-            <input type="range" class="custom-slider" id="baseSalarySlider" min="2000000" max="15000000" step="100000" value="3500000">
+          <h2 class="payroll-title">💰 급여 시스템 — 실시간 급여 계산기</h2>
+          <p style="color:var(--text-muted); font-size:0.88rem; margin-bottom:16px;">회사별 기본 월급을 직접 입력하면 공제율을 자동 계산합니다. 입력값은 자동 저장됩니다.</p>
+
+          <!-- 기본 월급 직접 입력 -->
+          <div class="form-group" style="margin-bottom:16px;">
+            <label style="font-size:0.88rem;color:var(--text-muted);margin-bottom:6px;display:block;font-weight:500;">💵 기본 월급 (세전, 원) — 직접 입력</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="number" class="form-control" id="baseSalaryInput" placeholder="예: 3500000" min="0" step="10000"
+                     style="font-size:1.1rem;font-weight:700;text-align:right;letter-spacing:1px;"
+                     value="3500000">
+              <span style="color:var(--text-muted);font-size:0.85rem;white-space:nowrap;">원</span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--secondary);margin-top:4px;" id="baseSalaryPreview">≈ 350만원</div>
           </div>
+
           <div class="slider-group">
             <div class="slider-header"><span class="slider-label">미사용 연차 보상 일수</span><span class="slider-value" id="unusedLeaveVal">0일</span></div>
             <input type="range" class="custom-slider" id="unusedLeaveSlider" min="0" max="25" step="1" value="0">
@@ -1041,7 +1142,7 @@
     <section class="tab-content" id="welfare">
       <div style="margin-bottom: 20px;">
         <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">🎁 사내 복지 포털</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">복지 포인트 확인, 사내 식권 및 간편 더치페이 송금을 지원합니다.</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">복지 포인트 확인, 사내 모바일 식권 사용, 주변 맛집 탐색 및 상권 분석 서비스를 제공합니다.</p>
       </div>
 
       <div class="welfare-portal-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
@@ -1077,72 +1178,101 @@
               <div style="font-size:2rem;"><i class="fa-solid fa-burger" style="color:var(--accent);"></i></div>
               <div>
                 <div style="font-weight:700; font-size:0.9rem;">오늘의 점심 메뉴</div>
-                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">한식: 숯불 바싹 불고기 & 달걀말이 | 일식: 돈카츠 카레 라이스</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">한식: 숯불 바싹 불고기 &amp; 달걀말이 | 일식: 돈카츠 카레 라이스</div>
+              </div>
+            </div>
+            <!-- 시내 모바일 식권 -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+              <div style="padding:14px;background:rgba(168,85,247,0.07);border:1px solid rgba(168,85,247,0.2);border-radius:12px;text-align:center;cursor:pointer;" onclick="window.showToast('🎟️ 식권 발급','GS25 편의점 5,000원 식권이 발급되었습니다.','success')">
+                <div style="font-size:1.5rem;margin-bottom:6px;">🏪</div>
+                <div style="font-size:0.82rem;font-weight:700;">편의점 식권</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">5,000원</div>
+              </div>
+              <div style="padding:14px;background:rgba(6,182,212,0.07);border:1px solid rgba(6,182,212,0.2);border-radius:12px;text-align:center;cursor:pointer;" onclick="window.showToast('🍽️ 식권 발급','주변 음식점 10,000원 식권이 발급되었습니다.','success')">
+                <div style="font-size:1.5rem;margin-bottom:6px;">🍜</div>
+                <div style="font-size:0.82rem;font-weight:700;">음식점 식권</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">10,000원</div>
+              </div>
+              <div style="padding:14px;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.2);border-radius:12px;text-align:center;cursor:pointer;" onclick="window.showToast('☕ 식권 발급','카페 음료 이용권이 발급되었습니다.','success')">
+                <div style="font-size:1.5rem;margin-bottom:6px;">☕</div>
+                <div style="font-size:0.82rem;font-weight:700;">카페 이용권</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">6,000원</div>
+              </div>
+              <div style="padding:14px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);border-radius:12px;text-align:center;cursor:pointer;" onclick="window.showToast('🛒 발급','온라인 쇼핑몰 복지 쿠폰이 발급되었습니다.','success')">
+                <div style="font-size:1.5rem;margin-bottom:6px;">🛒</div>
+                <div style="font-size:0.82rem;font-weight:700;">온라인 쿠폰</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">15,000원</div>
               </div>
             </div>
             <div style="display:flex; gap:10px;">
               <button class="btn-primary" style="flex:1;" id="btnWelfareIssueQR"><i class="fa-solid fa-qrcode"></i> 식권 QR 발급</button>
-              <button class="btn-secondary" style="flex:1;" onclick="alert('오늘의 식단 만족도 조사가 완료되었습니다.')"><i class="fa-solid fa-thumbs-up"></i> 맛 평가하기</button>
+              <button class="btn-secondary" style="flex:1;" onclick="window.showToast('👍 평가 완료','오늘의 식단 만족도 조사가 완료되었습니다.','success')"><i class="fa-solid fa-thumbs-up"></i> 맛 평가하기</button>
             </div>
           </div>
         </div>
 
-        <!-- Right Column: Split Bill & Point Transfer -->
+        <!-- Right Column: 주변 맛집 지도 & 상권 분석 -->
         <div style="display:flex; flex-direction:column; gap:20px;">
-          <!-- 사내 간편 송금 & 더치페이 정산 -->
+          <!-- 카카오맵 주변 맛집 -->
           <div class="glass" style="padding:24px;">
-            <div class="feed-header" style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
-              <span class="card-title"><i class="fa-solid fa-money-bill-transfer" style="color:var(--success);"></i> 점심 식대 더치페이 & 송금</span>
-              <span class="nav-badge" style="background:var(--success);">수수료 0원</span>
+            <div class="feed-header" style="margin-bottom:16px;">
+              <span class="card-title"><i class="fa-solid fa-location-dot" style="color:var(--danger);"></i> 주변 맛집 &amp; 상권 분석</span>
+              <span class="nav-badge" style="background:var(--danger);">카카오맵</span>
             </div>
-            
-            <div style="display:flex; gap:10px; margin-bottom:16px; border-bottom:1px solid var(--border-color); padding-bottom:12px;">
-              <button class="ai-tab-btn active" id="btnTabQuickTransfer" style="flex:1; justify-content:center;">간편 송금</button>
-              <button class="ai-tab-btn" id="btnTabDutchPay" style="flex:1; justify-content:center;">1/N 더치페이 정산</button>
+            <!-- 검색창 -->
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+              <input type="text" class="form-control" id="restaurantSearchInput" placeholder="음식 종류 검색 (예: 한식, 카페)" style="flex:1;">
+              <button class="btn-primary" style="padding:10px 16px;" onclick="window.searchNearbyRestaurants()"><i class="fa-solid fa-magnifying-glass"></i></button>
             </div>
-
-            <!-- Panel 1: Quick Transfer -->
-            <div id="panelQuickTransfer" style="display:flex; flex-direction:column; gap:12px;">
-              <div class="form-group">
-                <label>송금 대상 직원</label>
-                <select class="form-control" id="transferTargetUser" required>
-                  <!-- Dynamically populated employees -->
-                </select>
+            <!-- 지도 영역 -->
+            <div id="kakaoMapContainer" style="width:100%;height:260px;border-radius:12px;overflow:hidden;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;margin-bottom:14px;">
+              <div style="text-align:center;color:var(--text-muted);">
+                <i class="fa-solid fa-map" style="font-size:2rem;margin-bottom:10px;color:var(--primary);display:block;"></i>
+                <div style="font-size:0.85rem;">카카오맵 API 키 설정 후 활성화됩니다</div>
+                <div style="font-size:0.75rem;margin-top:4px;">.env에 KAKAO_MAP_KEY 추가</div>
               </div>
-              <div class="form-group">
-                <label>송금 포인트 (p)</label>
-                <input type="number" class="form-control" id="transferAmount" placeholder="송금할 금액을 입력하세요." min="1">
-              </div>
-              <div class="form-group">
-                <label>송금 메시지 (선택)</label>
-                <input type="text" class="form-control" id="transferMessage" placeholder="예: 오늘 점심 잘 먹었습니다!">
-              </div>
-              <button class="btn-primary" id="btnExecuteTransfer" style="width:100%;"><i class="fa-solid fa-paper-plane"></i> 포인트 즉시 송금하기</button>
             </div>
-
-            <!-- Panel 2: Dutch Pay -->
-            <div id="panelDutchPay" style="display:none; flex-direction:column; gap:12px;">
-              <div class="form-group">
-                <label>정산 총 금액 (원/p)</label>
-                <input type="number" class="form-control" id="dutchTotalAmount" placeholder="결제한 총액을 적어주세요.">
-              </div>
-              <div class="form-group">
-                <label>함께 식사한 직원 선택</label>
-                <div style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 8px; border: 1px solid var(--border-color);" id="dutchEmployeeCheckboxList">
-                  <!-- Dynamically populated employee checkboxes -->
+            <!-- 주변 맛집 카드 목록 -->
+            <div id="nearbyRestaurantList" style="display:flex;flex-direction:column;gap:10px;max-height:280px;overflow-y:auto;">
+              <div class="welfare-benefit-card" onclick="window.showToast('🍣 정보','청담순두부 | 한식 | ⭐4.6 | 도보 3분','info')">
+                <div class="welfare-benefit-icon">🍚</div>
+                <div class="welfare-benefit-info">
+                  <div class="welfare-benefit-name">청담 순두부 찌개</div>
+                  <div class="welfare-benefit-desc">한식 · ⭐ 4.6 · 도보 3분 · 7,000원~</div>
                 </div>
+                <span class="welfare-benefit-badge">인기</span>
               </div>
-              <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; font-size: 0.82rem; color: var(--text-muted); display:flex; justify-content:space-between; align-items:center;">
-                <span>1인당 정산 예정액:</span>
-                <strong style="color:var(--secondary); font-size:1.05rem;" id="dutchPerPersonAmount">0p</strong>
+              <div class="welfare-benefit-card" onclick="window.showToast('☕ 정보','스타벅스 | 카페 | ⭐4.4 | 도보 2분','info')">
+                <div class="welfare-benefit-icon">☕</div>
+                <div class="welfare-benefit-info">
+                  <div class="welfare-benefit-name">스타벅스 테헤란로점</div>
+                  <div class="welfare-benefit-desc">카페 · ⭐ 4.4 · 도보 2분 · 5,500원~</div>
+                </div>
+                <span class="welfare-benefit-badge">식권 가능</span>
               </div>
-              <button class="btn-primary" id="btnRequestDutchPay" style="width:100%;"><i class="fa-solid fa-calculator"></i> 참석자에게 송금 요청 & 정산</button>
+              <div class="welfare-benefit-card" onclick="window.showToast('🍜 정보','마루 라멘 | 일식 | ⭐4.8 | 도보 5분','info')">
+                <div class="welfare-benefit-icon">🍜</div>
+                <div class="welfare-benefit-info">
+                  <div class="welfare-benefit-name">마루 라멘 본점</div>
+                  <div class="welfare-benefit-desc">일식 · ⭐ 4.8 · 도보 5분 · 10,000원~</div>
+                </div>
+                <span class="welfare-benefit-badge">⭐TOP</span>
+              </div>
+              <div class="welfare-benefit-card" onclick="window.showToast('🥗 정보','그린볼 샐러드 | 건강식 | ⭐4.3 | 도보 4분','info')">
+                <div class="welfare-benefit-icon">🥗</div>
+                <div class="welfare-benefit-info">
+                  <div class="welfare-benefit-name">그린볼 샐러드 바</div>
+                  <div class="welfare-benefit-desc">건강식 · ⭐ 4.3 · 도보 4분 · 9,000원~</div>
+                </div>
+                <span class="welfare-benefit-badge">건강</span>
+              </div>
             </div>
           </div>
         </div>
 
       </div>
     </section>
+
 
     <!-- ===== TAB: APPROVAL & DOCS ===== -->
     <section class="tab-content" id="approval">

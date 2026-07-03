@@ -149,24 +149,42 @@ window.SalaryModule = (() => {
 
   // ── 모듈 초기화 ─────────────────────────────────────────────────
   function init() {
-    const baseSalarySlider    = document.getElementById('baseSalarySlider');
+    const baseSalaryInput     = document.getElementById('baseSalaryInput');
+    const baseSalaryPreview   = document.getElementById('baseSalaryPreview');
     const unusedLeaveSlider   = document.getElementById('unusedLeaveSlider');
     const overtimeHoursSlider = document.getElementById('overtimeHoursSlider');
     const calcBtn             = document.getElementById('calculatePayrollBtn');
     const severanceToggle     = document.getElementById('simSeveranceToggle');
     const severanceContainer  = document.getElementById('severanceInputsContainer');
 
-    if (!baseSalarySlider) return; // 급여 탭이 없으면 스킵
+    if (!baseSalaryInput) return; // 급여 탭이 없으면 스킵
+
+    // localStorage에서 저장된 기본급 복원
+    const saved = localStorage.getItem('oo_baseSalary');
+    if (saved) baseSalaryInput.value = saved;
+
+    // 기본급 입력 시 미리보기 업데이트 + 자동 저장
+    const updateBaseSalaryPreview = () => {
+      const val = Number(baseSalaryInput.value) || 0;
+      localStorage.setItem('oo_baseSalary', val);
+      const man = Math.round(val / 10000);
+      if (baseSalaryPreview) {
+        baseSalaryPreview.textContent = man >= 10000
+          ? `≈ ${(man/10000).toFixed(1)}억원`
+          : man >= 1000
+          ? `≈ ${(man/100).toFixed(0)}만원`
+          : `≈ ${man}만원`;
+      }
+    };
+    baseSalaryInput.addEventListener('input', updateBaseSalaryPreview);
+    updateBaseSalaryPreview();
 
     // 슬라이더 레이블 업데이트
     const updateLabels = () => {
       const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-      setEl('baseSalaryVal',    Number(baseSalarySlider.value).toLocaleString() + '원');
       setEl('unusedLeaveVal',   unusedLeaveSlider.value + '일');
       setEl('overtimeHoursVal', overtimeHoursSlider.value + '시간');
     };
-
-    baseSalarySlider.addEventListener('input', updateLabels);
     unusedLeaveSlider.addEventListener('input', updateLabels);
     overtimeHoursSlider.addEventListener('input', updateLabels);
     updateLabels();
@@ -181,9 +199,15 @@ window.SalaryModule = (() => {
     // 계산 버튼
     if (calcBtn) {
       calcBtn.addEventListener('click', async () => {
-        const base     = Number(baseSalarySlider.value);
+        const base     = Number(baseSalaryInput.value) || 3500000;
         const leaveDay = Number(unusedLeaveSlider.value);
         const otHours  = Number(overtimeHoursSlider.value);
+
+        if (base <= 0) {
+          window.showToast?.('입력 오류', '기본 월급을 올바르게 입력해주세요.', 'warning');
+          baseSalaryInput.focus();
+          return;
+        }
 
         const result = calculate(base, leaveDay, otHours);
 
@@ -213,7 +237,7 @@ window.SalaryModule = (() => {
           });
         }
 
-        if (window.showToast) window.showToast('📊 급여 계산 완료', '최신 근로기준법/세율 기준으로 계산되었습니다.', 'success');
+        if (window.showToast) window.showToast('📊 급여 계산 완료', `기본급 ${base.toLocaleString()}원 기준으로 계산되었습니다.`, 'success');
       });
     }
   }
