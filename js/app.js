@@ -722,10 +722,10 @@ function _initProfileEdit() {
       AppState.currentUser.dept      = document.getElementById('profileDeptInput')?.value   || AppState.currentUser.dept;
       AppState.currentUser.title     = document.getElementById('profileTitleInput')?.value  || AppState.currentUser.title;
 
-      // CloudDB에 업데이트
+      // CloudDB에 업데이트 (비동기 대기 추가)
       const idx = AppState.employees.findIndex(e => e.id === AppState.currentUser.id);
       if (idx !== -1) AppState.employees[idx] = { ...AppState.employees[idx], ...AppState.currentUser };
-      CloudDB.set('employees', AppState.employees);
+      await CloudDB.set('employees', AppState.employees);
       localStorage.setItem('ex_logged_user', JSON.stringify(AppState.currentUser));
 
       profileModal?.classList.remove('active');
