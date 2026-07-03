@@ -12,14 +12,14 @@
  *   ⑤ JWT 미들웨어 — 인증 없는 API 접근 완전 차단
  *   ⑥ Admin RBAC — /api/audit-logs 등 관리자 전용 엔드포인트 분리
  *   ⑦ 멀티 테넌트 격리 — oneoffice_ANTIGRAVITY_v1_{collection} 스키마
- *   ⑧ Gemini AI 서버 사이드 프록시 — API 키 프론트엔드 노출 완전 차단
+ *   ⑧ Google Gemini 1.5 Flash AI — 단독 AI 제공자 (서버사이드 프록시)
  *
  * 필수 API 엔드포인트:
  *   POST /api/login           → 3단계 인증 + JWT 발급
  *   POST /api/token/refresh   → 토큰 갱신
  *   GET  /api/audit-logs      → Admin 전용 감사 로그 (JWT 필수)
  *   POST /api/salary/calculate → 4대보험+소득세 계산 API (JWT 필수)
- *   POST /api/ai/generate     → Gemini AI 서버 사이드 프록시 (JWT 필수)
+ *   POST /api/ai/generate     → Gemini 1.5 Flash AI 서버 사이드 프록시
  *   GET  /api/state           → 전체 앱 상태 (JWT 필수)
  *   ... 기타 기존 엔드포인트들 (JWT 미들웨어 적용)
  */
@@ -482,9 +482,9 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     return res.status(503).json({ success: false, error: '서버에 GEMINI_API_KEY가 설정되지 않았습니다.' });
   }
 
-  // ── Google Gemini 1.5 Flash (단일 AI 제공자) ──────────────────
+  // ── Google Gemini 1.5 Flash — 단독 AI 제공자 ─────────────────
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
     const response = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
