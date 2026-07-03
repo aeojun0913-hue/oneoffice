@@ -476,18 +476,21 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
   }
 
   // ── Gemini API 키 확인 ────────────────────────────────────────
-  const geminiKey = process.env.GEMINI_API_KEY || 'AIzaSyAezv0644G4yvEN_GbXTk1T0WL4ptNcEf4';
+  const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!geminiKey) {
     return res.status(503).json({ success: false, error: '서버에 GEMINI_API_KEY가 설정되지 않았습니다.' });
   }
 
-  // ── Google Gemini 1.5 Flash — 단독 AI 제공자 ─────────────────
+  // ── Google Gemini 2.0 Flash — X-goog-api-key 헤더 방식 ────────
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
     const response = await fetch(url, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type':   'application/json',
+        'X-goog-api-key': geminiKey,   // ← 구글 공식 cURL 예제 방식
+      },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
@@ -497,13 +500,13 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
       console.error(`[AI] Gemini HTTP ${response.status}:`, errBody);
-      return res.status(500).json({ success: false, error: `Gemini API 오류 ${response.status}: ${errBody.substring(0, 200)}` });
+      return res.status(500).json({ success: false, error: `Gemini API 오류 ${response.status}: ${errBody.substring(0, 300)}` });
     }
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성하지 못했습니다.';
-    logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (Gemini)', `Gemini 1.5 Flash 호출 성공 (${prompt.length}자)`);
-    return res.json({ success: true, text, provider: 'gemini-1.5-flash' });
+    logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (Gemini)', `Gemini 2.0 Flash 호출 성공 (${prompt.length}자)`);
+    return res.json({ success: true, text, provider: 'gemini-2.0-flash' });
   } catch (err) {
     console.error('[AI] Gemini 네트워크 오류:', err.message);
     return res.status(500).json({ success: false, error: 'AI 서버 네트워크 오류: ' + err.message });
