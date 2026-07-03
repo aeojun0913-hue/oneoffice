@@ -262,6 +262,33 @@
   ],
   "oneoffice_ANTIGRAVITY_v1_securityLogs": [
     {
+      "id": 1783059414326,
+      "timestamp": "2026-07-03T06:16:54.326Z",
+      "userName": "홍길동_수정테스트",
+      "ip": "::1",
+      "action": "로그인 완료",
+      "detail": "[EMPLOYEE] 홍길동_수정테스트님 JWT 토큰 발급 성공 (테넌트: ANTIGRAVITY)",
+      "severity": "INFO"
+    },
+    {
+      "id": 1783059408365,
+      "timestamp": "2026-07-03T06:16:48.365Z",
+      "userName": "홍길동_수정테스트",
+      "ip": "::1",
+      "action": "OTP 발급",
+      "detail": "2단계 인증 코드 발급 → [EMPLOYEE] 권한 예정",
+      "severity": "INFO"
+    },
+    {
+      "id": 1783059405232,
+      "timestamp": "2026-07-03T06:16:45.232Z",
+      "userName": "GUEST",
+      "ip": "::1",
+      "action": "회사코드 인증",
+      "detail": "[ANTIGRAVITY] 워크스페이스 진입 성공",
+      "severity": "INFO"
+    },
+    {
       "id": 1783042466292,
       "timestamp": "2026-07-03T01:34:26.292Z",
       "userName": "홍길동_수정테스트",

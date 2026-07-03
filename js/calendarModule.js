@@ -67,6 +67,7 @@ window.CalendarModule = (() => {
       const dayOfWeek  = new Date(year, month, d).getDay();
 
       const cell = document.createElement('div');
+      cell.className = 'calendar-cell';
       cell.style.cssText = `
         min-height:88px; background:rgba(255,255,255,0.02);
         border:1px solid var(--border-color); border-radius:8px;
@@ -74,6 +75,7 @@ window.CalendarModule = (() => {
         transition:all 0.2s; cursor:pointer;
       `;
       if (isTodayCell) {
+        cell.classList.add('today');
         cell.style.borderColor = 'var(--primary)';
         cell.style.background  = 'rgba(99,102,241,0.06)';
       }
