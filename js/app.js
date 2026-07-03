@@ -532,6 +532,13 @@ function _initAllFeatures() {
   // 기분 체크
   _initMoodCheck();
 
+  // 추가 패치 기능 직접 초기화 (통합)
+  _initCalendarEditFeatures();
+  _initFloatingMessengerBubble();
+  _injectReportTemplateButtons();
+  _renderMyEventsList();
+  _initWelfareMapInterceptor();
+
   // 초기 렌더
   _updateUIForCurrentUser();
   window.renderRegistryEvents();
@@ -621,8 +628,7 @@ window.showMemberDetail = function(empId) {
     chatBtn.parentNode.replaceChild(newBtn, chatBtn);
     newBtn.addEventListener('click', () => {
       modal.classList.remove('active');
-      AppState.activeChatTarget = String(emp.id);
-      document.querySelector('.nav-item[data-tab="messenger"]')?.click();
+      window.openDMPanel(emp.id, emp.name);
     });
   }
   modal.classList.add('active');
@@ -1035,22 +1041,8 @@ window.sendDMPanel = async function() {
   window.showToast('💬 메시지 전송', '메시지가 전송되었습니다.', 'success');
 };
 
-// 조직도 구성원 "메시지 보내기" 버튼 패치
-const _origShowMemberDetail = window.showMemberDetail;
-window.showMemberDetail = function(empId) {
-  _origShowMemberDetail(empId);
-  const emp = AppState.employees.find(e => e.id === empId);
-  if (!emp) return;
-  const chatBtn = document.getElementById('detailModalChatBtn');
-  if (chatBtn) {
-    const newBtn = chatBtn.cloneNode(true);
-    chatBtn.parentNode.replaceChild(newBtn, chatBtn);
-    newBtn.addEventListener('click', () => {
-      document.getElementById('memberDetailModal')?.classList.remove('active');
-      window.openDMPanel(emp.id, emp.name);
-    });
-  }
-};
+// 조직도 구성원 "메시지 보내기" 버튼 패치 (원본에 통합 완료)
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // 📋 업무 보고 템플릿 기능
@@ -1231,12 +1223,166 @@ window.renderMarketItems = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// 🗺️ 카카오맵 연동 및 주변 맛집 검색
+// 🗺️ 카카오맵 연동 및 주변 맛집 검색 (동적 로딩 + GPS 위치 기반)
 // ═══════════════════════════════════════════════════════════════════════
 let kakaoMapInstance = null;
 let kakaoMapMarkers  = [];
-let _kakaoMapRetryCount = 0;
 let _kakaoMapLoading = false;
+let _kakaoUserLat    = 37.5006;  // 기본값: 역삼역
+let _kakaoUserLng    = 127.0364;
+
+// SDK 동적 로딩 Promise
+function _loadKakaoSDK() {
+  return new Promise((resolve, reject) => {
+    if (window.kakao && window.kakao.maps && window.kakao.maps.Map) { resolve(); return; }
+    if (window.kakao && window.kakao.maps) { kakao.maps.load(() => resolve()); return; }
+    const existing = document.getElementById('kakaoMapScript');
+    if (existing) {
+      existing.addEventListener('load',  () => kakao.maps.load(() => resolve()));
+      existing.addEventListener('error', () => reject(new Error('SDK 로드 오류')));
+      return;
+    }
+    const script = document.createElement('script');
+    script.id   = 'kakaoMapScript';
+    script.type = 'text/javascript';
+    script.src  = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=9a34a1ad6070f6cadb176a077cc450d7&libraries=services&autoload=false';
+    script.onload  = () => kakao.maps.load(() => resolve());
+    script.onerror = () => reject(new Error('Kakao SDK 스크립트 로드 실패 (도메인 등록·네트워크 확인)'));
+    document.head.appendChild(script);
+  });
+}
+
+// GPS 현재 위치 취득
+function _getUserLocation() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      ()  => resolve(null),
+      { timeout: 6000, maximumAge: 60000 }
+    );
+  });
+}
+
+// 지도 렌더
+function _renderKakaoMap(container, lat, lng) {
+  _kakaoUserLat = lat;
+  _kakaoUserLng = lng;
+  const center = new kakao.maps.LatLng(lat, lng);
+  kakaoMapInstance = new kakao.maps.Map(container, { center, level: 3 });
+  const posMarker = new kakao.maps.Marker({ position: center, map: kakaoMapInstance });
+  new kakao.maps.InfoWindow({
+    content: '<div style="padding:5px 8px;color:#000;font-size:0.75rem;font-weight:700;white-space:nowrap;">📍 현재 위치</div>'
+  }).open(kakaoMapInstance, posMarker);
+  window.searchNearbyRestaurants();
+}
+
+// 지도 초기화 진입점
+async function _initWelfareMap() {
+  const container = document.getElementById('kakaoMapContainer');
+  if (!container) return;
+  if (kakaoMapInstance) { kakaoMapInstance.relayout(); return; }
+  if (_kakaoMapLoading)  return;
+  _kakaoMapLoading = true;
+
+  container.innerHTML = `
+    <div style="text-align:center;color:var(--text-muted);padding:20px;">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size:2rem;margin-bottom:10px;color:var(--primary);display:block;"></i>
+      <div style="font-size:0.85rem;">📍 위치 확인 중...</div>
+    </div>`;
+
+  try {
+    await _loadKakaoSDK();
+    const loc = await _getUserLocation();
+    const lat = loc ? loc.lat : 37.5006;
+    const lng = loc ? loc.lng : 127.0364;
+    container.innerHTML = '';
+    _renderKakaoMap(container, lat, lng);
+    if (loc) {
+      window.showToast?.('📍 위치 확인', '현재 위치 주변 맛집을 검색합니다.', 'success');
+    } else {
+      window.showToast?.('📍 기본 위치 사용', '위치 권한 없음 — 역삼역 기준으로 검색합니다.', 'info');
+    }
+  } catch (err) {
+    console.error('[KakaoMap]', err);
+    container.innerHTML = `
+      <div style="text-align:center;color:var(--text-muted);padding:20px;">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;margin-bottom:10px;color:var(--warning);display:block;"></i>
+        <div style="font-size:0.9rem;font-weight:700;margin-bottom:6px;">카카오맵 로드 실패</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">${err.message}</div>
+        <button onclick="kakaoMapInstance=null;_kakaoMapLoading=false;_initWelfareMap();"
+          style="margin-top:12px;padding:8px 16px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-size:0.8rem;">
+          🔄 다시 시도
+        </button>
+      </div>`;
+  } finally {
+    _kakaoMapLoading = false;
+  }
+}
+
+window.initWelfareMap = _initWelfareMap;
+
+window.searchNearbyRestaurants = function() {
+  if (!kakaoMapInstance || !window.kakao?.maps?.services) return;
+  const input         = document.getElementById('restaurantSearchInput');
+  const keyword       = input?.value.trim() || '맛집';
+  const listContainer = document.getElementById('nearbyRestaurantList');
+
+  kakaoMapMarkers.forEach(m => m.setMap(null));
+  kakaoMapMarkers = [];
+
+  if (listContainer) listContainer.innerHTML = `
+    <div style="text-align:center;color:var(--text-muted);font-size:0.8rem;padding:16px;">
+      <i class="fa-solid fa-spinner fa-spin"></i> 검색 중...
+    </div>`;
+
+  const ps = new kakao.maps.services.Places();
+  ps.keywordSearch(keyword, (data, status) => {
+    if (status === kakao.maps.services.Status.OK) {
+      const bounds = new kakao.maps.LatLngBounds();
+      let html = '';
+      data.slice(0, 6).forEach((place, idx) => {
+        const coords = new kakao.maps.LatLng(place.y, place.x);
+        bounds.extend(coords);
+        const marker = new kakao.maps.Marker({ position: coords, map: kakaoMapInstance });
+        kakaoMapMarkers.push(marker);
+        const iw = new kakao.maps.InfoWindow({
+          content: `<div style="padding:5px 8px;color:#000;font-size:0.75rem;font-weight:700;white-space:nowrap;">${place.place_name}</div>`
+        });
+        kakao.maps.event.addListener(marker, 'click', () => iw.open(kakaoMapInstance, marker));
+        const icons = ['🍚', '🍜', '☕', '🍔', '🥗', '🍕'];
+        const dist  = place.distance ? ` · 📍${place.distance}m` : '';
+        html += `
+          <div class="welfare-benefit-card" onclick="window.focusOnMapPlace(${place.y},${place.x},'${place.place_name.replace(/'/g, "\\'") }',this)" style="cursor:pointer;">
+            <div class="welfare-benefit-icon">${icons[idx % icons.length]}</div>
+            <div class="welfare-benefit-info">
+              <div class="welfare-benefit-name">${place.place_name}</div>
+              <div class="welfare-benefit-desc">${place.category_group_name || '음식점'} · ${place.road_address_name || place.address_name}${dist}</div>
+              ${place.phone ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">📞 ${place.phone}</div>` : ''}
+            </div>
+            <span class="welfare-benefit-badge" style="background:var(--secondary);color:white;white-space:nowrap;">이동</span>
+          </div>`;
+      });
+      if (listContainer) listContainer.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--text-muted);">결과 없음</div>';
+      kakaoMapInstance.setBounds(bounds);
+    } else {
+      if (listContainer) listContainer.innerHTML = `<div style="text-align:center;color:var(--text-muted);font-size:0.8rem;padding:20px;">검색 결과가 없습니다. 다른 키워드를 입력해보세요.</div>`;
+    }
+  }, {
+    location: new kakao.maps.LatLng(_kakaoUserLat, _kakaoUserLng),
+    radius: 1000,
+    sort: kakao.maps.services.SortBy.DISTANCE
+  });
+};
+
+window.focusOnMapPlace = function(y, x, name, cardEl) {
+  if (!kakaoMapInstance) return;
+  kakaoMapInstance.setCenter(new kakao.maps.LatLng(y, x));
+  kakaoMapInstance.setLevel(2);
+  document.querySelectorAll('#nearbyRestaurantList .welfare-benefit-card').forEach(c => c.style.border = '');
+  if (cardEl) cardEl.style.border = '2px solid var(--secondary)';
+  window.showToast?.('📍 맛집 이동', `'${name}' 위치로 이동했습니다.`, 'info');
+};
 
 function _initWelfareMap() {
   const container = document.getElementById('kakaoMapContainer');
@@ -1393,20 +1539,8 @@ window.focusOnMapPlace = function(y, x, name) {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// 🔄 _initAllFeatures 확장 — 새 기능 추가 init
+// 🔄 welfare map 인터셉터 및 보고서 템플릿
 // ═══════════════════════════════════════════════════════════════════════
-const _origInitAllFeatures = _initAllFeatures;
-// 기존 _initAllFeatures에 새 기능 추가
-const _patchedInit = function() {
-  _initCalendarEditFeatures();
-  _initFloatingMessengerBubble();
-  // 업무보고 탭에 템플릿 버튼 삽입
-  _injectReportTemplateButtons();
-  _renderMyEventsList();
-  
-  // 카카오맵 탭 진입 감지용 인터셉터 추가
-  _initWelfareMapInterceptor();
-};
 
 function _initWelfareMapInterceptor() {
   // 이벤트 위임 방식으로 nav-menu 부모에 한 번만 등록 (innerHTML 교체에도 안전)
@@ -1444,13 +1578,3 @@ function _injectReportTemplateButtons() {
   if (titleInput) titleInput.parentElement.before(tplDiv);
 }
 
-// DOMContentLoaded 후 패치 실행을 위해 AuthModule.on('login') 이후에 추가 실행
-document.addEventListener('DOMContentLoaded', () => {
-  // login 이벤트 후 추가 기능 초기화
-  const _origLoginCb = AuthModule._loginCallbacks || [];
-  AuthModule.on?.('login', () => setTimeout(_patchedInit, 500));
-  // 세션 복원 후에도 실행
-  setTimeout(() => {
-    if (AppState.currentUser) _patchedInit();
-  }, 1000);
-});
