@@ -1293,16 +1293,12 @@ async function _initWelfareMap() {
 
   try {
     await _loadKakaoSDK();
-    const loc = await _getUserLocation();
-    const lat = loc ? loc.lat : 37.5006;
-    const lng = loc ? loc.lng : 127.0364;
+    // 강남역 좌표로 고정
+    const lat = 37.4979;
+    const lng = 127.0276;
     container.innerHTML = '';
     _renderKakaoMap(container, lat, lng);
-    if (loc) {
-      window.showToast?.('📍 위치 확인', '현재 위치 주변 맛집을 검색합니다.', 'success');
-    } else {
-      window.showToast?.('📍 기본 위치 사용', '위치 권한 없음 — 역삼역 기준으로 검색합니다.', 'info');
-    }
+    window.showToast?.('📍 강남역 기준', '강남역 주변 맛집을 검색합니다.', 'success');
   } catch (err) {
     console.error('[KakaoMap]', err);
     container.innerHTML = `
