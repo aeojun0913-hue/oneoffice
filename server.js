@@ -475,59 +475,39 @@ app.post('/api/ai/generate', aiLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: '프롬프트가 비어있습니다.' });
   }
 
+  // ── Gemini API 키 확인 ────────────────────────────────────────
   const geminiKey = process.env.GEMINI_API_KEY || 'AIzaSyAezv0644G4yvEN_GbXTk1T0WL4ptNcEf4';
-  const nvidiaKey = process.env.NVIDIA_API_KEY || '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';
 
-  // ── NVIDIA NIM API (1순위) ──────────────────────────────────────
-  if (nvidiaKey) {
-    try {
-      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${nvidiaKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model:       'nvidia/llama-3.1-nemotron-70b-instruct',
-          messages:    [{ role: 'user', content: prompt }],
-          temperature: 0.5,
-          max_tokens:  2048,
-        }),
-      });
-      if (!response.ok) throw new Error(`NVIDIA API ${response.status}`);
-      const data = await response.json();
-      const text = data.choices[0].message.content;
-      logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (NVIDIA)', `NVIDIA Llama 호출 성공 (${prompt.length}자)`);
-      return res.json({ success: true, text, provider: 'nvidia' });
-    } catch (err) {
-      console.error('[AI] NVIDIA 오류, Gemini로 fallback:', err.message);
-    }
+  if (!geminiKey) {
+    return res.status(503).json({ success: false, error: '서버에 GEMINI_API_KEY가 설정되지 않았습니다.' });
   }
 
-  // ── Google Gemini API (2순위) ───────────────────────────────────
-  if (geminiKey) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiKey}`;
-      const response = await fetch(url, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-        }),
-      });
-      if (!response.ok) throw new Error(`Gemini API ${response.status}`);
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성하지 못했습니다.';
-      logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (Gemini)', `Gemini 호출 성공 (${prompt.length}자)`);
-      return res.json({ success: true, text, provider: 'gemini' });
-    } catch (err) {
-      console.error('[AI] Gemini 오류:', err.message);
-      return res.status(500).json({ success: false, error: 'AI API 호출 실패: ' + err.message });
-    }
-  }
+  // ── Google Gemini 1.5 Flash (단일 AI 제공자) ──────────────────
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+    const response = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+      }),
+    });
 
-  // ── 키 없음: Mock 응답 ───────────────────────────────────────────
-  logSecurity(req.user?.name || 'anonymous', ip, 'AI Mock 응답', `.env에 API 키 없음. Mock 응답 반환`);
-  const mockText = `[AI 시뮬레이션 응답]\n\n요청: "${prompt.substring(0, 80)}..."\n\n실제 AI와 연동하려면:\n• .env 파일에 GEMINI_API_KEY=your_key 를 추가하세요.\n• 또는 NVIDIA_API_KEY=your_key 를 추가하세요.\n\n현재는 보안 백엔드 Phase 2 Mock 모드로 실행 중입니다.`;
-  return res.json({ success: true, text: mockText, provider: 'mock' });
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      console.error(`[AI] Gemini HTTP ${response.status}:`, errBody);
+      return res.status(500).json({ success: false, error: `Gemini API 오류 ${response.status}: ${errBody.substring(0, 200)}` });
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성하지 못했습니다.';
+    logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (Gemini)', `Gemini 1.5 Flash 호출 성공 (${prompt.length}자)`);
+    return res.json({ success: true, text, provider: 'gemini-1.5-flash' });
+  } catch (err) {
+    console.error('[AI] Gemini 네트워크 오류:', err.message);
+    return res.status(500).json({ success: false, error: 'AI 서버 네트워크 오류: ' + err.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════════════════
