@@ -395,7 +395,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.securityLogs    = data.securityLogs    || [];
   }
 
-  // ── 2. AuthModule 초기화 (로그인 UI + 세션 복원) ──────────────────
+  // ── 2. 테마 조절 초기화 (시력 보호용 화이트 모드 토글) ──────────────
+  const body = document.body;
+  const themeBtn = document.getElementById('themeToggleBtn');
+  const savedTheme = localStorage.getItem('oneoffice_theme');
+
+  const setLightTheme = (isLight) => {
+    if (isLight) {
+      body.classList.add('light-theme');
+      if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-moon"></i> <span>다크 모드</span>';
+      localStorage.setItem('oneoffice_theme', 'light');
+    } else {
+      body.classList.remove('light-theme');
+      if (themeBtn) themeBtn.innerHTML = '<i class="fa-solid fa-sun"></i> <span>화이트 모드</span>';
+      localStorage.setItem('oneoffice_theme', 'dark');
+    }
+  };
+
+  if (savedTheme === 'light') {
+    setLightTheme(true);
+  }
+
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const isCurrentlyLight = body.classList.contains('light-theme');
+      setLightTheme(!isCurrentlyLight);
+    });
+  }
+
+  // ── 3. AuthModule 초기화 (로그인 UI + 세션 복원) ──────────────────
   AuthModule.init();
 
   const restored = AuthModule.restoreSession();

@@ -35,6 +35,68 @@
       --sidebar-width: 260px;
     }
 
+    body.light-theme {
+      --bg-primary: #f3f4f6;
+      --bg-secondary: #ffffff;
+      --bg-card: rgba(255, 255, 255, 0.8);
+      --border-color: rgba(0, 0, 0, 0.08);
+      --border-color-glow: rgba(99, 102, 241, 0.4);
+      --text-main: #1f2937;
+      --text-muted: #4b5563;
+      --text-dark: #6b7280;
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+      --shadow-md: 0 8px 30px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+      --shadow-glow: 0 0 20px rgba(99,102,241,0.08);
+    }
+
+    body.light-theme .glass {
+      background: var(--bg-card);
+      box-shadow: var(--shadow-sm);
+    }
+    body.light-theme .glass-interactive:hover {
+      box-shadow: var(--shadow-md);
+    }
+    body.light-theme .sidebar {
+      background: var(--bg-secondary);
+    }
+    body.light-theme .nav-item:hover {
+      background: rgba(0,0,0,0.03);
+    }
+    body.light-theme .nav-item.active {
+      background: linear-gradient(90deg, rgba(99,102,241,0.1), rgba(6,182,212,0.03));
+    }
+    body.light-theme .user-profile-menu {
+      background: rgba(0,0,0,0.01);
+    }
+    body.light-theme .welcome-msg h1 {
+      background: linear-gradient(120deg, #111827 30%, #6366f1 90%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    body.light-theme select.form-control option {
+      background-color: var(--bg-secondary);
+      color: var(--text-main);
+    }
+    body.light-theme select.form-control optgroup {
+      background-color: var(--bg-secondary);
+      color: var(--primary);
+    }
+    body.light-theme .chat-bubble.bubble-received {
+      background: rgba(0,0,0,0.02);
+      color: var(--text-main);
+    }
+    body.light-theme .org-node {
+      color: var(--text-main);
+    }
+    body.light-theme .node-name {
+      color: #111827;
+    }
+    body.light-theme .node-dept {
+      color: var(--primary);
+    }
+
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background-color: var(--bg-primary); color: var(--text-main); font-family: var(--font-main); overflow-x: hidden; height: 100vh; display: flex; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -562,6 +624,10 @@
       </div>
       <div class="header-actions">
         <div class="header-widgets">
+          <!-- 테마 조절 컨트롤러 (화이트/다크 토글) -->
+          <button id="themeToggleBtn" class="welfare-action-btn" style="padding:8px 14px; font-weight:600; border-radius:8px;">
+            <i class="fa-solid fa-sun"></i> <span>화이트 모드</span>
+          </button>
           <div class="widget-weather" id="weatherWidget">
             <i class="fa-solid fa-cloud-sun"></i><span>서울시, 맑음 24°C</span>
           </div>
