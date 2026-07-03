@@ -675,7 +675,8 @@ function _initMessenger() {
 
 // 프로필 편집
 function _initProfileEdit() {
-  const profileBtn  = document.getElementById('userProfileBtn');
+  // 좌측 하단 프로필 영역(currentUserBtn) 클릭 시 모달이 정상적으로 열리도록 바인딩
+  const profileBtn  = document.getElementById('currentUserBtn');
   const profileModal= document.getElementById('profileModal');
   if (profileBtn && profileModal) {
     profileBtn.addEventListener('click', () => profileModal.classList.add('active'));
