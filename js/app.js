@@ -836,8 +836,9 @@ function _initRegistry() {
   });
 }
 
-// AI 오피스 탭 스위칭
+// AI 오피스 탭 스위칭 & 7대 기능 비동기 바인딩
 function _initAIOffice() {
+  // 탭 변경 리스너
   document.querySelectorAll('#aioffice .ai-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#aioffice .ai-tab-btn').forEach(b => b.classList.remove('active'));
@@ -847,6 +848,341 @@ function _initAIOffice() {
       if (target) target.classList.add('active');
     });
   });
+
+  // 1on1 면담용 직원 목록 옵션 동적 렌더링
+  const oneonSelect = document.getElementById('oneonEmpSelect');
+  if (oneonSelect) {
+    const list = AppState.employees || [];
+    oneonSelect.innerHTML = '<option value="">직원을 선택하세요...</option>' + 
+      list.map(e => `<option value="${e.id}">${e.name} (${e.dept} · ${e.title})</option>`).join('');
+  }
+
+  // 1. 📊 AI 엑셀 분석
+  const loadSampleBtn = document.getElementById('loadSampleDataBtn');
+  const genReportBtn = document.getElementById('generateReportBtn');
+  const excelInput   = document.getElementById('excelDataInput');
+  const excelOutput  = document.getElementById('aiReportOutput');
+
+  if (loadSampleBtn && excelInput) {
+    loadSampleBtn.addEventListener('click', () => {
+      const list = AppState.employees || [];
+      const csvLines = ['이름,부서,직급,MBTI,소통방식'];
+      list.forEach(e => {
+        csvLines.push(`${e.name},${e.dept},${e.title},${e.mbti || '?'},${e.workStyle || '?'}`);
+      });
+      excelInput.value = csvLines.join('\n');
+      window.showToast('📊 데이터 로드 완료', '사내 직원 명부 정보를 CSV 데이터로 불러왔습니다.', 'success');
+    });
+  }
+
+  if (genReportBtn && excelInput && excelOutput) {
+    genReportBtn.addEventListener('click', async () => {
+      const val = excelInput.value.trim();
+      if (!val) { window.showToast('입력 오류', '분석할 CSV 데이터를 입력해주세요.', 'warning'); return; }
+
+      excelOutput.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">인공지능이 데이터를 다차원으로 분석하는 중...</div></div>';
+      genReportBtn.disabled = true;
+
+      try {
+        const prompt = `다음은 사내 임직원 데이터(CSV 포맷)입니다. 이 데이터를 심도있게 분석하고 보고서 형태로 작성해줘.\n데이터:\n${val}\n\n보고서 양식(마크다운):\n- 1. 조직 통계 요약 (부서별 인원 분포 등)\n- 2. 구성원 성향(MBTI/소통 스타일) 특이사항 및 트렌드\n- 3. 추천 조율 방안 및 관리자 조언`;
+        const aiText = await MockAPI.generateWithAI(prompt);
+        excelOutput.innerHTML = `<div style="white-space:pre-wrap; font-size:0.88rem; line-height:1.7;">${aiText}</div>`;
+        window.showToast('🤖 AI 분석 완료', '데이터 분석 보고서 작성이 완료되었습니다.', 'success');
+      } catch (err) {
+        excelOutput.innerHTML = '<div style="color:var(--danger);">보고서 생성 중 오류가 발생했습니다. 다시 시도해 주세요.</div>';
+      } finally {
+        genReportBtn.disabled = false;
+      }
+    });
+  }
+
+  // 2. 🖵 PPT 자동 생성
+  const genPPTBtn = document.getElementById('generatePPTBtn');
+  const pptTitleInput = document.getElementById('pptTitle');
+  const pptContentInput = document.getElementById('pptContent');
+  const slideViewer = document.getElementById('slideViewer');
+  const downloadSlidesBtn = document.getElementById('downloadSlidesBtn');
+
+  if (genPPTBtn && pptTitleInput && pptContentInput && slideViewer) {
+    genPPTBtn.addEventListener('click', async () => {
+      const title = pptTitleInput.value.trim();
+      const content = pptContentInput.value.trim();
+      if (!title || !content) { window.showToast('입력 오류', '제목과 내용을 입력해 주세요.', 'warning'); return; }
+
+      slideViewer.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">AI 슬라이드 레이아웃을 생성 중...</div></div>';
+      genPPTBtn.disabled = true;
+      if (downloadSlidesBtn) downloadSlidesBtn.style.display = 'none';
+
+      try {
+        const prompt = `다음 발표 내용을 바탕으로 3장의 PPT 슬라이드 구성안을 JSON 배열 형식으로만 작성해줘. JSON 코드 이외의 다른 인사말이나 설명 텍스트는 절대 포함하지 말아줘.
+출력 포맷 예시:
+[
+  {"num": 1, "title": "슬라이드 1 제목", "bullets": ["핵심 포인트 1", "핵심 포인트 2"], "layout": "메인 타이틀 레이아웃"},
+  {"num": 2, "title": "슬라이드 2 제목", "bullets": ["상세 요약 1", "상세 요약 2"], "layout": "2컬럼 대조 구조"},
+  {"num": 3, "title": "슬라이드 3 제목", "bullets": ["결론 및 액션 플랜 1", "결론 및 액션 플랜 2"], "layout": "결론 강조 레이아웃"}
+]
+
+발표 제목: ${title}
+발표 내용: ${content}`;
+
+        const aiText = await MockAPI.generateWithAI(prompt);
+        // JSON 파싱 시도 (백틱 기호 제거 등 보완)
+        const cleanJSON = aiText.replace(/```json|```/g, '').trim();
+        const slides = JSON.parse(cleanJSON);
+
+        let slidesHTML = '';
+        slides.forEach(slide => {
+          slidesHTML += `
+            <div class="glass" style="padding:20px; border-radius:12px; border:1px solid var(--border-color); display:flex; flex-direction:column; gap:10px; background:linear-gradient(135deg, rgba(255,255,255,0.01), rgba(255,255,255,0.03)); position:relative; min-height:180px;">
+              <span style="position:absolute; bottom:14px; right:20px; font-size:1.4rem; font-weight:800; opacity:0.1;">SLIDE ${slide.num}</span>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--secondary); text-transform:uppercase; letter-spacing:1px;"><i class="fa-solid fa-layer-group"></i> ${slide.layout}</div>
+              <h4 style="font-size:1.05rem; font-weight:700; color:var(--text-main); margin-top:4px;">${slide.title}</h4>
+              <ul style="margin-left:18px; color:var(--text-muted); font-size:0.85rem; display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+                ${slide.bullets.map(b => `<li>${b}</li>`).join('')}
+              </ul>
+            </div>
+          `;
+        });
+        slideViewer.innerHTML = slidesHTML;
+        if (downloadSlidesBtn) downloadSlidesBtn.style.display = 'inline-block';
+        window.showToast('🤖 AI PPT 완성', '3장의 슬라이드 초안 레이아웃이 완성되었습니다.', 'success');
+      } catch (err) {
+        console.error(err);
+        slideViewer.innerHTML = '<div style="color:var(--danger);padding:20px;text-align:center;">슬라이드 생성 중 실패했습니다. 올바른 텍스트 구조로 다시 시도해 주세요.</div>';
+      } finally {
+        genPPTBtn.disabled = false;
+      }
+    });
+
+    if (downloadSlidesBtn) {
+      downloadSlidesBtn.addEventListener('click', () => {
+        window.print(); // 인쇄 다이얼로그 호출을 통한 슬라이드 저장 유도
+      });
+    }
+  }
+
+  // 3. ✍️ 결재 초안 작성기
+  const genDraftBtn = document.getElementById('generateDraftBtn');
+  const draftDocType = document.getElementById('draftDocType');
+  const draftSituation = document.getElementById('draftSituation');
+  const draftOutput = document.getElementById('draftDocOutput');
+  const printDraftBtn = document.getElementById('printDraftBtn');
+
+  if (genDraftBtn && draftDocType && draftSituation && draftOutput) {
+    // 퀵 프롬프트 예제 클릭 리스너 연결
+    document.querySelectorAll('#ai-draft .quick-prompt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const prompt = btn.getAttribute('data-prompt');
+        const type = btn.getAttribute('data-type');
+        if (draftDocType) draftDocType.value = type;
+        if (draftSituation) draftSituation.value = prompt;
+      });
+    });
+
+    genDraftBtn.addEventListener('click', async () => {
+      const type = draftDocType.value;
+      const sit  = draftSituation.value.trim();
+      if (!sit) { window.showToast('입력 오류', '상황 설명을 입력해 주세요.', 'warning'); return; }
+
+      draftOutput.innerHTML = '<div style="text-align:center;padding:40px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">정형 규격 기안서를 작성 중...</div></div>';
+      genDraftBtn.disabled = true;
+      if (printDraftBtn) printDraftBtn.style.display = 'none';
+
+      try {
+        const prompt = `다음 상황 정보를 바탕으로 공식 비즈니스용 '${type}' 기안서 초안을 작성해줘. 
+문서 번호, 기안 일자, 기안자(홍길동 대리), 제목, 기안 목적, 세부 상세 내역, 예산/비용 처리가 포함된 정형화된 공문서 규격에 알맞게 작성해줘.\n상황 설명:\n${sit}`;
+        const aiText = await MockAPI.generateWithAI(prompt);
+        draftOutput.innerHTML = `
+          <div style="padding:20px; border:1px solid var(--border-color); border-radius:8px; background:rgba(255,255,255,0.01); font-family:monospace; white-space:pre-wrap; font-size:0.85rem; line-height:1.8;">
+            ${aiText}
+          </div>
+          <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+            <button class="btn-primary" style="padding:6px 12px; font-size:0.78rem;" onclick="window.showToast('📄 상신 완료', 'AI가 작성한 기안서가 결재 문서함으로 연동 상신되었습니다.', 'success')"><i class="fa-solid fa-file-export"></i> 결재선 연동 상신</button>
+          </div>
+        `;
+        if (printDraftBtn) printDraftBtn.style.display = 'inline-block';
+        window.showToast('🤖 AI 기안서 완성', '기안 초안 작성이 완료되었습니다.', 'success');
+      } catch (err) {
+        draftOutput.innerHTML = '<div style="color:var(--danger);">초안 생성 도중 오류가 발생했습니다.</div>';
+      } finally {
+        genDraftBtn.disabled = false;
+      }
+    });
+
+    if (printDraftBtn) {
+      printDraftBtn.addEventListener('click', () => {
+        const printContent = draftOutput.innerHTML;
+        const orig = document.body.innerHTML;
+        document.body.innerHTML = `
+          <div style="padding:50px; background:white; color:black; font-family:monospace; line-height:1.8;">
+            ${printContent}
+          </div>
+        `;
+        window.print();
+        document.body.innerHTML = orig;
+        window.location.reload(); // 복구
+      });
+    }
+  }
+
+  // 4. ⚖️ AI 노무 컨설턴트 (챗봇)
+  const hrSendBtn = document.getElementById('hrChatSend');
+  const hrInput   = document.getElementById('hrChatInput');
+  const hrWindow  = document.getElementById('hrChatWindow');
+
+  if (hrWindow) {
+    // 퀵 질문 클릭 매핑
+    document.querySelectorAll('#ai-hr .hr-quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const q = btn.getAttribute('data-q');
+        if (hrInput) { hrInput.value = q; hrSendBtn?.click(); }
+      });
+    });
+
+    const sendHRChat = async () => {
+      const txt = hrInput.value.trim();
+      if (!txt) return;
+
+      // 사용자 말풍선 추가
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble bubble-sent';
+      userBubble.style.margin = '10px 0';
+      userBubble.innerHTML = `<span style="font-size:0.75rem;color:var(--text-muted);display:block;margin-bottom:3px;">나</span>${txt}`;
+      hrWindow.appendChild(userBubble);
+      hrInput.value = '';
+      hrWindow.scrollTop = hrWindow.scrollHeight;
+
+      // AI 대기 말풍선 추가
+      const aiBubble = document.createElement('div');
+      aiBubble.className = 'chat-bubble bubble-received';
+      aiBubble.style.margin = '10px 0';
+      aiBubble.innerHTML = `<span style="font-size:0.75rem;color:var(--secondary);display:block;margin-bottom:3px;">AI 노무 컨설턴트</span><i class="fa-solid fa-spinner fa-spin"></i> 노무 법령 검토 중...`;
+      hrWindow.appendChild(aiBubble);
+      hrWindow.scrollTop = hrWindow.scrollHeight;
+
+      try {
+        const prompt = `당신은 대한민국 고용노동법에 정통한 일류 노무사입니다. 다음 질문에 대해 현행 법 규정과 가이드를 친절하고 알기 쉽게 답변해 주세요. 만약 계산이 필요한 질문(주휴수당 등)의 경우 자세한 계산식도 표기해줘.\n질문: ${txt}`;
+        const aiText = await MockAPI.generateWithAI(prompt);
+        aiBubble.innerHTML = `<span style="font-size:0.75rem;color:var(--secondary);display:block;margin-bottom:3px;">AI 노무 컨설턴트</span><div style="white-space:pre-wrap;line-height:1.6;font-size:0.85rem;">${aiText}</div>`;
+      } catch (err) {
+        aiBubble.innerHTML = `<span style="font-size:0.75rem;color:var(--secondary);display:block;margin-bottom:3px;">AI 노무 컨설턴트</span>노무 상담 연결 실패. 다시 전송해 주세요.`;
+      }
+      hrWindow.scrollTop = hrWindow.scrollHeight;
+    };
+
+    if (hrSendBtn) hrSendBtn.addEventListener('click', sendHRChat);
+    if (hrInput) hrInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendHRChat(); });
+  }
+
+  // 5. 🎙️ AI 회의록 요약
+  const genMeetingBtn = document.getElementById('generateMeetingBtn');
+  const meetingInput  = document.getElementById('meetingDataInput');
+  const meetingOutput = document.getElementById('meetingReportOutput');
+
+  if (genMeetingBtn && meetingInput && meetingOutput) {
+    genMeetingBtn.addEventListener('click', async () => {
+      const val = meetingInput.value.trim();
+      if (!val) { window.showToast('입력 오류', '요약할 회의록 텍스트를 입력해주세요.', 'warning'); return; }
+
+      meetingOutput.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">AI가 대화록의 의제와 결정 사항을 매핑하는 중...</div></div>';
+      genMeetingBtn.disabled = true;
+
+      try {
+        const prompt = `다음 회의 원시 대화 기록을 요약하여 공식 회의록 보고서를 작성해줘.
+포함해야 할 사항:
+1. 회의 안건 (Agenda)
+2. 대화 요약 및 의제 분석
+3. 결정된 주요 사항 (Key Decisions)
+4. 담당자별 할 일 목록 (Action Items)
+
+대화 기록:\n${val}`;
+        const aiText = await MockAPI.generateWithAI(prompt);
+        meetingOutput.innerHTML = `<div style="white-space:pre-wrap; font-size:0.88rem; line-height:1.7;">${aiText}</div>`;
+        window.showToast('🤖 회의록 요약 완료', '공식 회의록 요약 보고서 작성이 완료되었습니다.', 'success');
+      } catch (err) {
+        meetingOutput.innerHTML = '<div style="color:var(--danger);">회의록 요약 중 오류가 발생했습니다.</div>';
+      } finally {
+        genMeetingBtn.disabled = false;
+      }
+    });
+  }
+
+  // 6. 📢 AI 마케팅 카피라이터
+  const genMarketingBtn = document.getElementById('generateMarketingBtn');
+  const marketingKwInput = document.getElementById('marketingKeyword');
+  const marketingDetailInput = document.getElementById('marketingDetail');
+  const marketingOutput = document.getElementById('marketingOutput');
+
+  if (genMarketingBtn && marketingKwInput && marketingDetailInput && marketingOutput) {
+    genMarketingBtn.addEventListener('click', async () => {
+      const kw = marketingKwInput.value.trim();
+      const det = marketingDetailInput.value.trim();
+      if (!kw) { window.showToast('입력 오류', '핵심 제품명/소재를 입력해 주세요.', 'warning'); return; }
+
+      marketingOutput.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">최적의 광고 마케팅 카피 문구를 추천받는 중...</div></div>';
+      genMarketingBtn.disabled = true;
+
+      try {
+        const prompt = `다음 핵심 키워드와 특징 정보를 조합하여, 
+1) 공식 보도자료 첫 문장 헤드라인
+2) 인스타그램 홍보용 트렌디한 감성 카피 3가지 시안
+3) 링크드인(비즈니스용) 설득형 카피 1가지 시안을 각각 작성해줘. 해시태그와 적절한 이모티콘도 포함해줘.
+
+핵심 소재: ${kw}
+세부 특징: ${det}`;
+
+        const aiText = await MockAPI.generateWithAI(prompt);
+        marketingOutput.innerHTML = `<div style="white-space:pre-wrap; font-size:0.88rem; line-height:1.7;">${aiText}</div>`;
+        window.showToast('🤖 카피 생성 완료', '마케팅 카피 추천 리스트가 생성되었습니다.', 'success');
+      } catch (err) {
+        marketingOutput.innerHTML = '<div style="color:var(--danger);">카피 문구 생성 도중 오류가 발생했습니다.</div>';
+      } finally {
+        genMarketingBtn.disabled = false;
+      }
+    });
+  }
+
+  // 7. 👥 1on1 면담 코치
+  const genOneonBtn = document.getElementById('generateOneonBtn');
+  const oneonRecent = document.getElementById('oneonRecentWork');
+  const oneonOutput = document.getElementById('oneonOutput');
+
+  if (genOneonBtn && oneonSelect && oneonRecent && oneonOutput) {
+    genOneonBtn.addEventListener('click', async () => {
+      const empId = oneonSelect.value;
+      const detail = oneonRecent.value.trim();
+      if (!empId) { window.showToast('선택 오류', '면담 대상 직원을 선택해 주세요.', 'warning'); return; }
+
+      const emp = AppState.employees.find(e => String(e.id) === String(empId));
+      if (!emp) return;
+
+      oneonOutput.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">직원 성향과 MBTI 데이터를 융합하여 코칭 질문지를 생성 중...</div></div>';
+      genOneonBtn.disabled = true;
+
+      try {
+        const prompt = `당신은 최고 수준의 HR 팀장 코치입니다. 면담 대상 직원의 인사 프로필 정보를 바탕으로 1대1 면담 준비 질문지와 가이드를 작성해줘.
+대상 직원 이름: ${emp.name}
+소속 부서: ${emp.dept}
+직급: ${emp.title}
+MBTI 성향: ${emp.mbti || '알 수 없음'}
+소통 및 업무 성향: ${emp.workStyle || '알 수 없음'}
+최근 업무 상태/특이사항: ${detail || '특이사항 없음'}
+
+가이드 필수 항목:
+1. 대상 직원의 성향(MBTI/소통 방식) 특징 해석 및 면담 시 마음을 여는 아이스브레이커 질문 3가지
+2. 직무 상황 피드백 제공 요령
+3. 관리자를 위한 코칭 및 격려 조언`;
+
+        const aiText = await MockAPI.generateWithAI(prompt);
+        oneonOutput.innerHTML = `<div style="white-space:pre-wrap; font-size:0.88rem; line-height:1.7;">${aiText}</div>`;
+        window.showToast('🤖 1on1 가이드 완성', `${emp.name}님과의 면담 코칭 가이드가 완성되었습니다.`, 'success');
+      } catch (err) {
+        oneonOutput.innerHTML = '<div style="color:var(--danger);">가이드 생성 도중 오류가 발생했습니다.</div>';
+      } finally {
+        genOneonBtn.disabled = false;
+      }
+    });
+  }
 }
 
 // 출퇴근 버튼
