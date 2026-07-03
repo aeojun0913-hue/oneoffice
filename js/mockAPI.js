@@ -177,10 +177,10 @@ window.MockAPI = (() => {
     async saveCalendarEvent(eventData) {
       const newEvent = { id: String(Date.now()), ...eventData };
 
-      // CloudDB 즉시 저장
-      const events = CloudDB.get('calendarEvents', []);
+      // CloudDB 즉시 저장 (비동기 대기 추가)
+      const events = await CloudDB.get('calendarEvents', []);
       events.push(newEvent);
-      CloudDB.set('calendarEvents', events);
+      await CloudDB.set('calendarEvents', events);
 
       // 서버 동기화
       await _fetch('/api/calendar', 'POST', eventData);
@@ -193,11 +193,11 @@ window.MockAPI = (() => {
     async saveChatMessage(channel, sender, senderName, text) {
       const msg = { sender, senderName, text, timestamp: new Date().toISOString() };
 
-      // CloudDB 즉시 저장
-      const logs = CloudDB.get('chatLogs', {});
+      // CloudDB 즉시 저장 (비동기 대기 추가)
+      const logs = await CloudDB.get('chatLogs', {});
       if (!logs[channel]) logs[channel] = [];
       logs[channel].push(msg);
-      CloudDB.set('chatLogs', logs);
+      await CloudDB.set('chatLogs', logs);
 
       // 서버 동기화
       await _fetch('/api/chats', 'POST', { channel, sender, senderName, text });
@@ -209,9 +209,9 @@ window.MockAPI = (() => {
      */
     async saveReport(reportData) {
       const report = { id: Date.now(), ...reportData };
-      const reports = CloudDB.get('reports', []);
+      const reports = await CloudDB.get('reports', []);
       reports.unshift(report);
-      CloudDB.set('reports', reports);
+      await CloudDB.set('reports', reports);
       await _fetch('/api/reports', 'POST', reportData);
       return report;
     },
@@ -244,10 +244,10 @@ window.MockAPI = (() => {
         const res = await fetch(url);
         if (!res.ok) throw new Error();
         const data = await res.json();
-        CloudDB.set('weatherCache', { data: data.current_weather, cachedAt: new Date().toISOString() });
+        await CloudDB.set('weatherCache', { data: data.current_weather, cachedAt: new Date().toISOString() });
         return data.current_weather;
       } catch {
-        const cache = CloudDB.get('weatherCache');
+        const cache = await CloudDB.get('weatherCache');
         return cache ? cache.data : { temperature: 24, weathercode: 0 };
       }
     },
@@ -260,19 +260,19 @@ window.MockAPI = (() => {
       const res = await _fetch('/api/welfare/transfer', 'POST', { receiverId, amount, message });
       if (res?.success) {
         // CloudDB 즉시 반영
-        const pts = CloudDB.get('welfarePoints', {});
+        const pts = await CloudDB.get('welfarePoints', {});
         pts[String(senderId)]   = (pts[String(senderId)]   || 0) - amount;
         pts[String(receiverId)] = (pts[String(receiverId)] || 0) + amount;
-        CloudDB.set('welfarePoints', pts);
+        await CloudDB.set('welfarePoints', pts);
         if (window.AppState) window.AppState.welfarePoints = pts;
         return { success: true, senderPoints: pts[String(senderId)] };
       }
       // Fallback: CloudDB만
-      const pts = CloudDB.get('welfarePoints', {});
+      const pts = await CloudDB.get('welfarePoints', {});
       if ((pts[String(senderId)] || 0) < amount) return { success: false, error: '포인트 부족' };
       pts[String(senderId)]   = (pts[String(senderId)]   || 0) - amount;
       pts[String(receiverId)] = (pts[String(receiverId)] || 0) + amount;
-      CloudDB.set('welfarePoints', pts);
+      await CloudDB.set('welfarePoints', pts);
       if (window.AppState) window.AppState.welfarePoints = pts;
       return { success: true, senderPoints: pts[String(senderId)] };
     },
@@ -281,10 +281,10 @@ window.MockAPI = (() => {
      * 동호회 가입
      */
     async joinClub(userId, clubId, clubName) {
-      const memberships = CloudDB.get('clubMemberships', {});
+      const memberships = await CloudDB.get('clubMemberships', {});
       if (!memberships[userId]) memberships[userId] = [];
       if (!memberships[userId].includes(clubId)) memberships[userId].push(clubId);
-      CloudDB.set('clubMemberships', memberships);
+      await CloudDB.set('clubMemberships', memberships);
       return { success: true, memberships: memberships[userId] };
     },
 
@@ -292,10 +292,10 @@ window.MockAPI = (() => {
      * 급여 시뮬레이션 히스토리 저장
      */
     async savePayrollSimulation(userId, result) {
-      const history = CloudDB.get('payrollHistory', []);
+      const history = await CloudDB.get('payrollHistory', []);
       history.unshift({ id: Date.now(), userId, ...result, savedAt: new Date().toISOString() });
       if (history.length > 10) history.splice(10);
-      CloudDB.set('payrollHistory', history);
+      await CloudDB.set('payrollHistory', history);
       // 서버에도 저장 (급여 계산 API 통해)
       await _fetch('/api/salary/calculate', 'POST', result);
       return { success: true };

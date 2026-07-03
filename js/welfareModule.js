@@ -23,15 +23,15 @@ window.WelfareModule = (() => {
     { id:'bus3', name:'C노선 (신도림행)', stops:'신도림역 → 구로디지털단지 → 사무실', time:'08:15', seats:50, registered:22 },
   ];
 
-  function _getBusRoutes() {
-    return CloudDB.get('busRoutes', DEFAULT_BUS_ROUTES);
+  async function _getBusRoutes() {
+    return await CloudDB.get('busRoutes', DEFAULT_BUS_ROUTES);
   }
 
   // ── 버스 노선 렌더링 ─────────────────────────────────────────────
-  function renderBusRouteList() {
+  async function renderBusRouteList() {
     const list = document.getElementById('busRouteAdminList');
     if (!list) return;
-    const routes = _getBusRoutes();
+    const routes = await _getBusRoutes();
     const isAdmin = AuthModule.isAdmin();
 
     list.innerHTML = routes.map(r => `
@@ -54,42 +54,42 @@ window.WelfareModule = (() => {
   }
 
   /** 버스 노선 신청 (Employee) */
-  function applyBusRoute(id, name) {
+  async function applyBusRoute(id, name) {
     const user = window.AppState?.currentUser;
     if (!user) return;
-    const memberships = CloudDB.get('busApplied', {});
+    const memberships = await CloudDB.get('busApplied', {});
     if (memberships[user.id] === id) {
       if (window.showToast) window.showToast('이미 신청됨', `이미 [${name}] 노선을 신청하셨습니다.`, 'warning');
       return;
     }
     memberships[user.id] = id;
-    CloudDB.set('busApplied', memberships);
+    await CloudDB.set('busApplied', memberships);
 
     // 신청자 수 업데이트
-    const routes = _getBusRoutes();
+    const routes = await _getBusRoutes();
     const idx = routes.findIndex(r => r.id === id);
-    if (idx !== -1) { routes[idx].registered += 1; CloudDB.set('busRoutes', routes); }
+    if (idx !== -1) { routes[idx].registered += 1; await CloudDB.set('busRoutes', routes); }
 
-    AuthModule.logSecurity(user.name, '버스 노선 신청', `[${name}] 통근버스 신청 완료`);
+    await AuthModule.logSecurity(user.name, '버스 노선 신청', `[${name}] 통근버스 신청 완료`);
     if (window.showToast) window.showToast('🚌 버스 신청 완료', `[${name}] 노선 탑승 신청이 완료되었습니다.`, 'success');
     renderBusRouteList();
   }
 
   /** 버스 노선 추가 (Admin only) */
-  function addBusRoute(name, stops, time) {
+  async function addBusRoute(name, stops, time) {
     if (!AuthModule.isAdmin()) return;
-    const routes = _getBusRoutes();
+    const routes = await _getBusRoutes();
     routes.push({ id: 'bus' + Date.now(), name, stops, time, seats:40, registered:0 });
-    CloudDB.set('busRoutes', routes);
+    await CloudDB.set('busRoutes', routes);
     renderBusRouteList();
     if (window.showToast) window.showToast('🚌 노선 추가 완료', `[${name}] 노선이 등록되었습니다.`, 'success');
   }
 
   /** 버스 노선 삭제 (Admin only) */
-  function deleteBusRoute(id) {
+  async function deleteBusRoute(id) {
     if (!AuthModule.isAdmin()) return;
-    const routes = _getBusRoutes().filter(r => r.id !== id);
-    CloudDB.set('busRoutes', routes);
+    const routes = (await _getBusRoutes()).filter(r => r.id !== id);
+    await CloudDB.set('busRoutes', routes);
     renderBusRouteList();
     if (window.showToast) window.showToast('삭제 완료', '버스 노선이 삭제되었습니다.', 'info');
   }
@@ -127,15 +127,15 @@ window.WelfareModule = (() => {
     };
 
     if (window.AppState) window.AppState.employees.push(newEmp);
-    CloudDB.set('employees', window.AppState?.employees || []);
+    await CloudDB.set('employees', window.AppState?.employees || []);
 
     // 복지 포인트 초기 지급
-    const pts = CloudDB.get('welfarePoints', {});
+    const pts = await CloudDB.get('welfarePoints', {});
     pts[String(newEmp.id)] = 50000;
-    CloudDB.set('welfarePoints', pts);
+    await CloudDB.set('welfarePoints', pts);
     if (window.AppState) window.AppState.welfarePoints = pts;
 
-    AuthModule.logSecurity(window.AppState?.currentUser?.name || 'Admin', '직원 계정 생성',
+    await AuthModule.logSecurity(window.AppState?.currentUser?.name || 'Admin', '직원 계정 생성',
       `신규 직원 [${name}] 계정 생성 및 초기 복지포인트 50,000p 지급`);
 
     renderEmpManageList();
@@ -143,13 +143,13 @@ window.WelfareModule = (() => {
     if (window.showToast) window.showToast('✅ 직원 계정 생성', `${name}님 계정 생성 (초기 복지포인트 50,000p)`, 'success');
   }
 
-  function removeEmployee(id) {
+  async function removeEmployee(id) {
     if (!AuthModule.isAdmin()) return;
     if (!confirm('정말 이 직원 계정을 삭제하시겠습니까?')) return;
     const emp = window.AppState?.employees.find(e => e.id === id);
     if (window.AppState) window.AppState.employees = window.AppState.employees.filter(e => e.id !== id);
-    CloudDB.set('employees', window.AppState?.employees || []);
-    AuthModule.logSecurity(window.AppState?.currentUser?.name || 'Admin', '직원 계정 삭제',
+    await CloudDB.set('employees', window.AppState?.employees || []);
+    await AuthModule.logSecurity(window.AppState?.currentUser?.name || 'Admin', '직원 계정 삭제',
       `직원 [${emp?.name}] 계정 삭제 처리`);
     renderEmpManageList();
     if (window.renderSecurityAuditLogs) window.renderSecurityAuditLogs();
@@ -226,8 +226,8 @@ window.WelfareModule = (() => {
   }
 
   // ── 모듈 초기화 ─────────────────────────────────────────────────
-  function init() {
-    renderBusRouteList();
+  async function init() {
+    await renderBusRouteList();
     renderEmpManageList();
 
     if (AuthModule.isAdmin()) {
