@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 🔐 authModule.js — SaaS 핵심 모듈 3: 인증/RBAC/세션 관리
  *
  * 담당 기능:
@@ -200,19 +200,18 @@ window.AuthModule = (() => {
       // 서버 시도
       const res = await MockAPI.fetchDataFromServer('/api/login', 'POST', { step: 2, email, password });
 
-      if (res && res.otpHint) {
-        // 서버 있음 → 서버 OTP 사용
-        _otp = res.otpHint;
-        if (window.showSecurityOTPToast) window.showSecurityOTPToast(_otp);
+      if (res && res.success) {
+        // 서버 인증 성공 → OTP는 서버 콘솔([OTP-DEV])에서 확인 (실배포: SMS/이메일)
+        // 보안: OTP를 API 응답에서 제거됨 (서버에서만 보관)
+        if (window.showToast) window.showToast('📱 OTP 발송됨', '서버 콘솔 [OTP-DEV] 로그에서 OTP를 확인하세요. (실배포 시 SMS/이메일 발송)', 'info');
       } else {
-        // LocalStorage 모드: 직원 목록에서 이메일 검색 (비동기 대기 추가)
+        // LocalStorage 모드: 서버 없을 때 Mock OTP 생성 (개발 전용)
         const employees = await CloudDB.get('employees', MockAPI.getDefaultEmployees());
         const emp = employees.find(e => e.email.toLowerCase() === email.toLowerCase());
         if (!emp) { setError('이메일이 올바르지 않습니다.'); return; }
-        // Mock OTP 생성 (6자리 랜덤)
         _otp = String(Math.floor(100000 + Math.random() * 900000));
         if (window.showSecurityOTPToast) window.showSecurityOTPToast(_otp);
-        if (window.showToast) window.showToast('🔒 LocalStorage 모드', '서버 없이 실행 중입니다. OTP 알림을 확인하세요.', 'info');
+        if (window.showToast) window.showToast('🔒 LocalStorage 모드', '서버 없이 실행 중. OTP 알림을 확인하세요.', 'info');
       }
 
       clearError();

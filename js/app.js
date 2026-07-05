@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 🚀 app.js — OneOffice 앱 부트스트랩 & 전역 상태 조율 (Entry Point)
  *
  * 역할:
@@ -132,10 +132,13 @@ function _updateUIForCurrentUser() {
   const avatarDiv = document.getElementById('currentUserAvatar');
   if (avatarDiv) avatarDiv.textContent = user.initial || user.name[0];
 
-  // 남은 연차 (상태 메시지에서 숫자 파싱)
-  const leaveMatch = (user.status || '').match(/\d+(\.\d+)?/);
-  const leaveDays  = leaveMatch ? leaveMatch[0] : '15';
-  setEl('statLeaveDays', leaveDays + '일');
+  // 남은 연차 - 캘린더 이벤트에서 사용 일수 집계 (실시간 차감)
+  const _todayStr = new Date().toISOString().split('T')[0];
+  const _usedDays = (AppState.events || []).filter(e =>
+    e.employeeId === user.id && e.type === 'leave' && e.start <= _todayStr
+  ).reduce((sum, e) => sum + (Number(e.leaveDays) || 0), 0);
+  const _remain = Math.max(0, 15 - _usedDays);
+  setEl('statLeaveDays', (_remain % 1 === 0 ? _remain : _remain.toFixed(1)) + '일');
 
   // 복지 포인트
   const points = AppState.welfarePoints[String(user.id)] || 0;
@@ -631,6 +634,24 @@ function _initDirectory() {
     });
   });
 
+  // 실시간 직원 검색 (directorySearch)
+  const dirSearch = document.getElementById('directorySearch');
+  if (dirSearch) {
+    let _dST;
+    dirSearch.addEventListener('input', () => {
+      clearTimeout(_dST);
+      _dST = setTimeout(() => {
+        const q = dirSearch.value.toLowerCase().trim();
+        const ad = document.querySelector('.filter-bar .btn-filter.active')?.getAttribute('data-filter') || 'all';
+        let list = ad === 'all' ? AppState.employees : AppState.employees.filter(e => e.dept === ad);
+        if (q) list = list.filter(e =>
+          e.name.toLowerCase().includes(q) || e.dept.toLowerCase().includes(q) ||
+          e.title.toLowerCase().includes(q) || (e.mbti||'').toLowerCase().includes(q));
+        renderEmps(list.length ? list : AppState.employees);
+      }, 150);
+    });
+  }
+
   document.querySelectorAll('.org-node').forEach(node => {
     node.addEventListener('click', () => {
       const emp = AppState.employees.find(e => e.id === Number(node.getAttribute('data-emp-id')));
@@ -966,7 +987,32 @@ function _initAIOffice() {
 
     if (downloadSlidesBtn) {
       downloadSlidesBtn.addEventListener('click', () => {
-        window.print(); // 인쇄 다이얼로그 호출을 통한 슬라이드 저장 유도
+        window.print();
+      });
+    }
+
+    // exportToPPTBtn: 슬라이드를 HTML 파일로 내보내기
+    const exportToPPTBtn = document.getElementById('exportToPPTBtn');
+    if (exportToPPTBtn) {
+      exportToPPTBtn.addEventListener('click', () => {
+        const slides = slideViewer?.innerHTML;
+        if (!slides || !slides.trim()) {
+          window.showToast?.('⚠️ 슬라이드 없음', '먼저 슬라이드를 생성해주세요.', 'warning');
+          return;
+        }
+        const title = pptTitleInput?.value?.trim() || 'OneOffice_슬라이드';
+        const blob = new Blob([
+          '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + title + '</title>' +
+          '<style>body{font-family:sans-serif;background:#0f1117;color:#f1f5f9;padding:40px}' +
+          '.slide{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;margin-bottom:24px;page-break-after:always;}</style></head>' +
+          '<body><h1 style="color:#6366f1;margin-bottom:24px;">' + title + '</h1>' + slides + '</body></html>'
+        ], { type: 'text/html;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = title.replace(/\s+/g,'_') + '.html';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        window.showToast?.('📥 내보내기 완료', title + '.html 파일이 저장되었습니다.', 'success');
       });
     }
   }
@@ -1817,13 +1863,10 @@ function _injectReportTemplateButtons() {
 // 👥 실시간 팀 근무 현황 위젯
 // ═══════════════════════════════════════════════════════════════════════
 function _initTeamAttendance() {
+  // 2분류만: 출근중 / 부재중 (위치추적 없음, 캘린더 휴가 기반)
   const STATUS_COLORS = {
-    '재실 근무': 'var(--success)',
-    '재택근무':  'var(--warning)',
-    '외근':      'var(--warning)',
-    '출장':      'var(--warning)',
-    '휴가/부재': 'var(--danger)',
-    '퇴근':      'rgba(150,150,150,0.5)',
+    '출근중': 'var(--success)',
+    '부재중': 'var(--danger)',
   };
 
   function _getEmpStatus(emp) {
@@ -1832,13 +1875,9 @@ function _initTeamAttendance() {
       e.employeeId === emp.id &&
       e.start <= today && (e.end || e.start) >= today
     );
-    if (!evt) return '재실 근무';
-    const t = evt.title || '';
-    if (t.includes('재택')) return '재택근무';
-    if (t.includes('외근')) return '외근';
-    if (t.includes('출장')) return '출장';
-    if (t.includes('연차') || t.includes('반차') || t.includes('병가') || t.includes('경조')) return '휴가/부재';
-    return '재실 근무';
+    if (!evt || evt.type !== 'leave') return '출근중';
+    return '부재중'; // 오늘 휴가/부재 이벤트가 있으면 부재중
+
   }
 
   function _renderAttendance() {
@@ -1857,8 +1896,8 @@ function _initTeamAttendance() {
     ];
     grid.innerHTML = emps.map(emp => {
       const status = _getEmpStatus(emp);
-      const color  = STATUS_COLORS[status] || STATUS_COLORS['재실 근무'];
-      if (status === '재실 근무') inCount++; else outCount++;
+      const color  = STATUS_COLORS[status] || STATUS_COLORS['출근중'];
+      if (status === '출근중') inCount++; else outCount++;
       return `
         <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;
           background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:12px;
@@ -1909,7 +1948,23 @@ function _initSVGOrgChart() {
   const deptMap = {};
   emps.forEach(e => { if (!deptMap[e.dept]) deptMap[e.dept] = []; deptMap[e.dept].push(e); });
   const depts = Object.keys(deptMap);
+  // Tab-switch fix: clientWidth=0 when hidden, use ResizeObserver
   const W = container.clientWidth || 720;
+  if (W < 50 && typeof ResizeObserver !== 'undefined') {
+    container._orgDone = false;
+    const _ro = new ResizeObserver(entries => {
+      for (const e of entries) {
+        if (e.contentRect.width > 50) {
+          _ro.disconnect();
+          container._orgDone = false;
+          _initSVGOrgChart();
+          break;
+        }
+      }
+    });
+    _ro.observe(container);
+    return;
+  }
   const H = 380;
   const NODE_W = 115, NODE_H = 56;
   const DEPT_COLORS = ['#6366f1','#06b6d4','#a855f7','#10b981','#f59e0b','#ef4444','#ec4899'];
@@ -2083,6 +2138,17 @@ function _initAICopilot() {
     document.querySelector(`.nav-item[data-tab="${tabId}"]`)?.click();
   }
 
+  // 경량 마크다운 변환 (XSS 안전)
+  function _md(text) {
+    return text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g,'<em>$1</em>')
+      .replace(/^#{1,3}\s+(.+)$m/gm,'<div style="font-weight:700;color:var(--secondary);margin:4px 0 2px;">$1</div>')
+      .replace(/^[-•]\s+(.+)$/gm,'<div style="padding-left:10px;">• $1</div>')
+      .replace(/\n/g,'<br>');
+  }
+
   function _addBubble(text, side = 'received', asHtml = false) {
     const div = document.createElement('div');
     div.className = `chat-bubble bubble-${side}`;
@@ -2095,8 +2161,8 @@ function _initAICopilot() {
       lbl.textContent = '🤖 AI Copilot';
       div.appendChild(lbl);
       const content = document.createElement('div');
-      content.style.whiteSpace = 'pre-wrap';
-      if (asHtml) content.innerHTML = text; else content.textContent = text;
+      // AI 응답은 항상 마크다운 렌더링 적용
+      content.innerHTML = _md(text);
       div.appendChild(content);
     }
     body.appendChild(div);
@@ -2128,14 +2194,40 @@ function _initAICopilot() {
         if (lower.includes('내일'))      { const d = new Date(); d.setDate(d.getDate()+1); start = d.toISOString().split('T')[0]; }
         else if (lower.includes('모레')) { const d = new Date(); d.setDate(d.getDate()+2); start = d.toISOString().split('T')[0]; }
         else if (dateRx)                 { start = dateRx[1]; }
-        _goTab('calendar');
-        await CalendarModule.applyLeave(start, start, type, 'AI Copilot 자동 신청');
-        updateLoad(`✅ [${type}] ${start} 캘린더에 즉시 등록됐습니다! 캘린더 탭에서 확인하세요.`);
+        // 즉시 등록 대신 확인 UI 표시
+        if (loadDiv.lastChild) {
+          loadDiv.lastChild.innerHTML =
+            '\uD83D\uDCCB <strong>[' + type + '] \uc2e0\uccad \ud655\uc778</strong><br><br>' +
+            '\u2022 \uc77c\uc815: <strong>' + start + '</strong><br>' +
+            '\u2022 \uc885\ub958: <strong>' + type + '</strong><br><br>\ub4f1\ub85d\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?';
+        }
+        const _cf = document.createElement('div');
+        _cf.style.cssText = 'display:flex;gap:8px;margin-top:8px;';
+        const _ok = document.createElement('button');
+        _ok.textContent = '\u2705 \ub4f1\ub85d';
+        _ok.style.cssText = 'background:var(--success);color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:700;';
+        const _no = document.createElement('button');
+        _no.textContent = '\u274c \ucde8\uc18c';
+        _no.style.cssText = 'background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.35);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;';
+        _ok.onclick = async () => {
+          _cf.remove();
+          if (loadDiv.lastChild) loadDiv.lastChild.innerHTML = '\u23F3 \ub4f1\ub85d \uc911...';
+          _goTab('calendar');
+          await CalendarModule.applyLeave(start, start, type, 'AI Copilot \uc2e0\uccad');
+          if (loadDiv.lastChild) loadDiv.lastChild.innerHTML = '\u2705 [' + type + '] ' + start + ' \ub4f1\ub85d \uc644\ub8cc! \uce98\ub9b0\ub354\uc5d0\uc11c \ud655\uc778\ud558\uc138\uc694.';
+          if (window.updateUIForCurrentUser) window.updateUIForCurrentUser();
+        };
+        _no.onclick = () => { _cf.remove(); if (loadDiv.lastChild) loadDiv.lastChild.innerHTML = '\ucde8\uc18c\ud588\uc2b5\ub2c8\ub2e4.'; };
+        _cf.appendChild(_ok); _cf.appendChild(_no);
+        loadDiv.appendChild(_cf);
+        sendBtn.disabled = false;
         return;
       }
 
       // ── 업무 보고서 초안 ──────────────────────────────────────────
-      if (lower.includes('보고서') || lower.includes('업무보고') || lower.includes('보고')) {
+      const _isReportCmd = (lower.includes('보고서') || lower.includes('업무보고')) &&
+                             (lower.includes('써') || lower.includes('작성') || lower.includes('초안') || lower.includes('만들'));
+      if (_isReportCmd) {
         _goTab('reports');
         const type = lower.includes('주간') ? 'weekly' : lower.includes('프로젝트') ? 'project' : 'daily';
         window.applyReportTemplate(type);

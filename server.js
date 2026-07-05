@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ╔══════════════════════════════════════════════════════════════════════╗
  * ║  OneOffice — Phase 2 Enterprise Security Backend                    ║
  * ║  server.js v2.0 | 대기업 인트라넷급 SaaS 백엔드                        ║
@@ -36,6 +36,7 @@ const dotenv     = require('dotenv');
 const rateLimit  = require('express-rate-limit');
 const jwt        = require('jsonwebtoken');
 const helmet     = require('helmet');
+const bcrypt     = require('bcryptjs');
 
 dotenv.config();
 
@@ -50,12 +51,12 @@ const JWT_EXPIRES_IN  = '8h';   // 업무 시간 기준 8시간 만료
 const TENANT_ID       = 'ANTIGRAVITY';
 const COMPANY_CODE    = 'ANTIGRAVITY';
 
-// 비밀번호 → 역할 매핑 (Phase 2: 실제 DB 해시 비교로 교체 예정)
-const ROLE_BY_PASSWORD = {
-  '1111': 'admin',
-  '0000': 'employee',
+// 비밀번호 해시 (bcrypt salt=12) - 절대 평문 저장 금지
+// 비밀번호 변경 시: node -e "const b=require('bcryptjs');console.log(b.hashSync('새비밀번호',12))"
+const ROLE_BY_HASH = {
+  admin:    process.env.ADMIN_PASSWORD_HASH    || '\\\.tsJz7aLqNrelTgZIUsDV7NP3N7gmTpEE0YXkhrUO/m',
+  employee: process.env.EMPLOYEE_PASSWORD_HASH || '\\\/O3Hsv09ch/zY6BDafeumfGlJ7mkYUvJzBCeT.mM8aUofoFOgae',
 };
-
 // ══════════════════════════════════════════════════════════════════════
 // 🔧 Express 미들웨어 설정
 // ══════════════════════════════════════════════════════════════════════
@@ -66,19 +67,37 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
+// CORS: 로컬개발 + 배포 도메인만 허용 (전체오픈 '*' 제거)
+const _allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  ...(process.env.ALLOWED_ORIGIN ? process.env.ALLOWED_ORIGIN.split(',').map(o => o.trim()) : []),
+];
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || '*',
+  origin: (origin, cb) => {
+    if (!origin || _allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS: 허가되지 않은 출처'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
-app.use(bodyParser.json({ limit: '2mb' }));
+app.use(bodyParser.json({ limit: '1mb' }));
 
-// 정적 파일 서빙 (HTML, CSS, JS 모듈)
-app.use(express.static(__dirname, {
-  setHeaders: (res) => {
-    res.setHeader('Cache-Control', 'no-cache'); // 항상 최신 파일 제공
+// 🛡️ 보안 민감 파일 직접 접근 차단
+const _BLOCKED = ['/database.json','/.env','/credentials.md','/package.json','/package-lock.json'];
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase();
+  if (_BLOCKED.includes(p) || p.startsWith('/.') || (p.endsWith('.json') && p !== '/manifest.json')) {
+    return res.status(403).json({ error: '접근이 거부되었습니다.', code: 'FORBIDDEN' });
   }
+  next();
+});
+
+// 정적 파일 서빙 (HTML, CSS, JS)
+app.use(express.static(__dirname, {
+  setHeaders: (res) => { res.setHeader('Cache-Control', 'no-cache'); },
 }));
 
 // ══════════════════════════════════════════════════════════════════════
@@ -276,7 +295,7 @@ const aiLimiter = rateLimit({
 // ══════════════════════════════════════════════════════════════════════
 const _otpStore = new Map(); // { email: { otp, role, expiry } }
 
-app.post('/api/login', loginLimiter, (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { step, code, email, password, otp } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
@@ -296,10 +315,14 @@ app.post('/api/login', loginLimiter, (req, res) => {
       return res.status(400).json({ success: false, error: '이메일과 비밀번호를 입력해주세요.' });
     }
 
-    const role = ROLE_BY_PASSWORD[password];
+    // bcrypt 해시 비교 (admin/employee 역할 판별)
+    let role = null;
+    for (const [r, hash] of Object.entries(ROLE_BY_HASH)) {
+      if (await bcrypt.compare(String(password), hash)) { role = r; break; }
+    }
     if (!role) {
-      logSecurity('GUEST', ip, '비밀번호 오류', `잘못된 비밀번호 시도 (email: ${email})`, 'WARN');
-      return res.status(400).json({ success: false, error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
+      logSecurity('GUEST', ip, 'Password Error', `Wrong password attempt (email: )`, 'WARN');
+      return res.status(400).json({ success: false, error: 'Invalid email or password.' });
     }
 
     const employees = getCollection('employees', _getDefaultEmployees());
@@ -315,11 +338,12 @@ app.post('/api/login', loginLimiter, (req, res) => {
 
     // 만료된 OTP 자동 정리
     setTimeout(() => _otpStore.delete(email), 5 * 60 * 1000);
-
-    logSecurity(employee.name, ip, 'OTP 발급', `2단계 인증 코드 발급 → [${role.toUpperCase()}] 권한 예정`);
+    // [개발모드] OTP 서버 콘솔 출력 (실배포 시 SMS/이메일 발송으로 교체)
+    // [개발모드] OTP 서버 콘솔 출력
+    if (process.env.NODE_ENV !== 'production') console.log('[OTP-DEV]', email, '->', generatedOTP, '(5min valid)');
     return res.json({
       success:  true,
-      otpHint:  generatedOTP, // 실제 환경: SMS/이메일 발송 후 제거
+      // otpHint 제거 (보안): OTP는 서버에서만 보관 → 실서비스에서는 SMS/이메일 발송
       employee: { id: employee.id, name: employee.name, email: employee.email, dept: employee.dept, title: employee.title },
     });
   }
@@ -464,53 +488,245 @@ app.post('/api/salary/calculate', requireAuth, (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════
-// ④ POST /api/ai/generate — Gemini AI 서버 사이드 프록시
+// ④ POST /api/ai/generate — Gemini AI 서버 사이드 프록시 (멀티모델 + 오프라인 폴백)
 //    ⚠️ API 키는 서버(.env)에서만 관리 — 프론트엔드 완전 차단
 // ══════════════════════════════════════════════════════════════════════
+
+// 오프라인 규칙 기반 AI (Gemini 429 시 폴백)
+function _ruleBasedAI(prompt) {
+  const p = prompt.toLowerCase();
+
+  // 주휴수당
+  if (p.includes('주휴수당')) {
+    return `📌 **주휴수당 계산법 (2026년 기준)**\n\n주휴수당 = (1주 소정근로시간 / 40시간) × 8시간 × 시간급\n\n예시: 시급 10,030원, 주 40시간 근무\n→ 주휴수당 = (40/40) × 8 × 10,030 = **80,240원/주**\n\n⚖️ 근거: 근로기준법 제55조`;
+  }
+
+  // 연차/휴가
+  if (p.includes('연차')) {
+    return `📌 **연차 유급휴가 기준 (근로기준법 제60조)**\n\n• 1년 미만: 1개월 개근 시 1일 (최대 11일)\n• 1년 이상: 15일 (기본) + 2년마다 1일 추가 (최대 25일)\n\n⚠️ 미사용 연차는 1년 후 소멸 (연차수당 청구 가능)`;
+  }
+
+  // 퇴직금
+  if (p.includes('퇴직금')) {
+    return `📌 **퇴직금 계산 (근로자퇴직급여 보장법)**\n\n퇴직금 = 평균임금 × 30일 × (재직일수 / 365)\n\n• 1년 이상 근무한 모든 근로자에게 지급 의무\n• 평균임금: 퇴직 직전 3개월 총 임금 ÷ 해당 일수`;
+  }
+
+  // 4대보험
+  if (p.includes('4대보험') || p.includes('보험료')) {
+    return `📌 **2026년 4대보험 요율 (근로자 부담분)**\n\n| 항목 | 요율 |\n|------|------|\n| 국민연금 | 4.5% |\n| 건강보험 | 3.545% |\n| 장기요양 | 건보료 × 12.95% |\n| 고용보험 | 0.9% |\n\n※ 산재보험은 사업주 전액 부담`;
+  }
+
+  // 보고서 관련
+  if (p.includes('보고서') || p.includes('업무보고')) {
+    const today = new Date().toISOString().slice(0,10);
+    return `📝 **업무 보고서 초안**\n\n[${today}] 업무 보고\n\n■ 오늘 완료한 업무\n1. [작성해주세요]\n2. [작성해주세요]\n\n■ 진행 중인 업무\n1. [작성해주세요]\n\n■ 내일 예정 업무\n1. [작성해주세요]\n\n■ 특이사항\n- 없음`;
+  }
+
+  // PPT/슬라이드
+  if (p.includes('ppt') || p.includes('슬라이드') || p.includes('발표')) {
+    return JSON.stringify([
+      {"num":1,"title":"주제 소개 및 배경","bullets":["핵심 목적 및 배경 설명","현황 및 문제 인식"],"layout":"메인 타이틀 레이아웃"},
+      {"num":2,"title":"본론: 주요 내용 분석","bullets":["데이터 기반 분석 결과","핵심 인사이트 도출"],"layout":"2컬럼 대조 구조"},
+      {"num":3,"title":"결론 및 액션 플랜","bullets":["최종 제안 사항","담당자별 실행 계획"],"layout":"결론 강조 레이아웃"}
+    ]);
+  }
+
+  // 회의록
+  if (p.includes('회의') || p.includes('회의록')) {
+    return `📋 **회의록 요약**\n\n■ 회의 안건\n- 입력하신 내용 기반 안건\n\n■ 주요 논의 사항\n- 핵심 포인트 1\n- 핵심 포인트 2\n\n■ 결정 사항\n- 결정 내용\n\n■ Action Items\n- [ ] 담당자: 기한`;
+  }
+
+  // 마케팅 카피
+  if (p.includes('마케팅') || p.includes('카피') || p.includes('광고')) {
+    return `📢 **마케팅 카피 초안**\n\n🗞️ 보도자료 헤드라인: "혁신적인 솔루션으로 비즈니스 패러다임을 바꾸다"\n\n📱 인스타그램 감성 카피:\n① "새로운 시작, 새로운 가능성 ✨ #혁신 #미래"\n② "당신의 일상을 바꿀 단 하나의 선택 💫"\n③ "더 나은 내일을 위한 오늘의 선택 🌟"\n\n💼 링크드인 비즈니스 카피:\n"업무 효율을 극대화하는 스마트 솔루션으로 팀의 생산성을 혁신하세요."`;
+  }
+
+  // 기본 응답
+  return `🤖 **AI Copilot 응답**\n\n입력하신 내용: "${prompt.slice(0, 100)}"\n\n현재 AI 서비스가 일시적으로 제한되어 있습니다. (Gemini API quota 초과)\n\n다음 기능은 정상 동작합니다:\n• 캘린더 일정 등록/수정/삭제\n• 조직도 검색 및 직원 정보 조회\n• 급여 계산기\n• 복지포인트 관리\n\n⏳ AI 기능은 잠시 후 자동 복구됩니다.`;
+}
+
+
+// ── 멀티 키 로테이션: GEMINI_API_KEY_1/2/3 지원 ────────────────────────
+// .env에 GEMINI_API_KEY_1, GEMINI_API_KEY_2, ... 를 추가하면 자동 로테이션
+const _geminiKeyPool = (() => {
+  const keys = [];
+  // 번호 붙은 키들 수집 (GEMINI_API_KEY_1, _2, _3 ...)
+  for (let i = 1; i <= 10; i++) {
+    const k = process.env[`GEMINI_API_KEY_${i}`];
+    if (k) keys.push(k);
+  }
+  // 기본 키도 추가 (중복 방지)
+  const base = process.env.GEMINI_API_KEY;
+  if (base && !keys.includes(base)) keys.push(base);
+  return keys;
+})();
+
+// 라운드로빈 카운터 (키 소진 추적)
+const _keyStatus = {}; // { key: { exhaustedUntil: timestamp } }
+let _keyIdx = 0;
+
+function _getNextGeminiKey() {
+  const now = Date.now();
+  const available = _geminiKeyPool.filter(k => {
+    const s = _keyStatus[k];
+    if (!s) return true;
+    if (s.exhaustedUntil && now < s.exhaustedUntil) return false; // 아직 소진 중
+    return true;
+  });
+  if (available.length === 0) return null; // 전부 소진
+  const key = available[_keyIdx % available.length];
+  _keyIdx++;
+  return key;
+}
+
+function _markKeyExhausted(key, retryAfterSeconds = 60) {
+  _keyStatus[key] = { exhaustedUntil: Date.now() + retryAfterSeconds * 1000 };
+  console.warn(`[AI] 키 ${key.substring(0,8)}... quota 소진 → ${retryAfterSeconds}초 후 재시도`);
+}
+
+// ── AI 응답 캐시 (24시간 TTL) ─────────────────────────────────────────
+const _aiCache = new Map(); // key: prompt_hash → { text, provider, cachedAt }
+const AI_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24시간
+
+function _getCached(prompt) {
+  const entry = _aiCache.get(prompt);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > AI_CACHE_TTL_MS) { _aiCache.delete(prompt); return null; }
+  return entry;
+}
+
+function _setCached(prompt, text, provider) {
+  if (_aiCache.size > 500) {
+    // LRU: 가장 오래된 100개 삭제
+    const keys = [..._aiCache.keys()].slice(0, 100);
+    keys.forEach(k => _aiCache.delete(k));
+  }
+  _aiCache.set(prompt, { text, provider, cachedAt: Date.now() });
+}
+
+// ── Groq API 호출 (Llama-3 무료 티어) ──────────────────────────────────
+async function _callGroq(prompt) {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return null;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 2048,
+        temperature: 0.7,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content;
+    if (text) { console.info('[AI] Groq Llama-3 응답 성공'); return text; }
+    return null;
+  } catch (e) {
+    console.warn('[AI] Groq 오류:', e.message);
+    return null;
+  }
+}
+
 app.post('/api/ai/generate', aiLimiter, async (req, res) => {
-  const { prompt, context = '' } = req.body;
+  const { prompt } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
   if (!prompt?.trim()) {
     return res.status(400).json({ success: false, error: '프롬프트가 비어있습니다.' });
   }
 
-  // ── Gemini API 키 확인 ────────────────────────────────────────
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  if (!geminiKey) {
-    return res.status(503).json({ success: false, error: '서버에 GEMINI_API_KEY가 설정되지 않았습니다.' });
+  // ── 1단계: 캐시 확인 ─────────────────────────────────────────────────
+  const cached = _getCached(prompt);
+  if (cached) {
+    console.info(`[AI] 캐시 HIT (provider: ${cached.provider})`);
+    return res.json({ success: true, text: cached.text, provider: `${cached.provider}(cached)` });
   }
 
-  // ── Google Gemini 2.0 Flash — X-goog-api-key 헤더 방식 ────────
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
-    const response = await fetch(url, {
-      method:  'POST',
-      headers: {
-        'Content-Type':   'application/json',
-        'X-goog-api-key': geminiKey,   // ← 구글 공식 cURL 예제 방식
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-      }),
-    });
+  // ── 2단계: Gemini 멀티키 × 멀티모델 시도 ──────────────────────────────
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
 
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '');
-      console.error(`[AI] Gemini HTTP ${response.status}:`, errBody);
-      return res.status(500).json({ success: false, error: `Gemini API 오류 ${response.status}: ${errBody.substring(0, 300)}` });
+  for (const model of models) {
+    // 키 풀에서 사용 가능한 키 순환
+    const attemptsPerModel = Math.max(_geminiKeyPool.length, 1);
+    for (let attempt = 0; attempt < attemptsPerModel; attempt++) {
+      const geminiKey = _getNextGeminiKey();
+      if (!geminiKey) break; // 모든 키 소진
+
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-goog-api-key': geminiKey },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
+            }),
+          }
+        );
+
+        if (response.status === 429) {
+          // Retry-After 헤더 파싱
+          const retryAfter = parseInt(response.headers.get('retry-after') || '60', 10);
+          _markKeyExhausted(geminiKey, retryAfter);
+          continue; // 다음 키로
+        }
+
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => '');
+          console.warn(`[AI] ${model} key=${geminiKey.substring(0,8)}... HTTP ${response.status}`);
+          continue;
+        }
+
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          _setCached(prompt, text, model);
+          logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성', `${model} 성공 (${prompt.length}자)`);
+          return res.json({ success: true, text, provider: model });
+        }
+
+      } catch (err) {
+        console.warn(`[AI] ${model} 네트워크 오류:`, err.message);
+      }
     }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성하지 못했습니다.';
-    logSecurity(req.user?.name || 'anonymous', ip, 'AI 생성 (Gemini)', `Gemini 2.0 Flash 호출 성공 (${prompt.length}자)`);
-    return res.json({ success: true, text, provider: 'gemini-2.0-flash' });
-  } catch (err) {
-    console.error('[AI] Gemini 네트워크 오류:', err.message);
-    return res.status(500).json({ success: false, error: 'AI 서버 네트워크 오류: ' + err.message });
   }
+
+  // ── 3단계: Groq Llama-3 폴백 ────────────────────────────────────────
+  const groqText = await _callGroq(prompt);
+  if (groqText) {
+    _setCached(prompt, groqText, 'groq-llama3');
+    return res.json({ success: true, text: groqText, provider: 'groq-llama3' });
+  }
+
+  // ── 4단계: 규칙 기반 오프라인 AI ────────────────────────────────────
+  console.info('[AI] 모든 AI 소진 → 규칙 기반 폴백');
+  const fallbackText = _ruleBasedAI(prompt);
+  return res.json({ success: true, text: fallbackText, provider: 'rule-based-fallback' });
+});
+
+// ── AI 상태 조회 엔드포인트 (관리용) ───────────────────────────────────
+app.get('/api/ai/status', (req, res) => {
+  const now = Date.now();
+  const keyStatuses = _geminiKeyPool.map((k, i) => {
+    const s = _keyStatus[k] || {};
+    const exhausted = s.exhaustedUntil && now < s.exhaustedUntil;
+    return {
+      index: i + 1,
+      keyPrefix: k.substring(0, 8) + '...',
+      status: exhausted ? '소진' : '사용가능',
+      resumesIn: exhausted ? Math.round((s.exhaustedUntil - now) / 1000) + '초' : '-',
+    };
+  });
+  res.json({
+    totalKeys: _geminiKeyPool.length,
+    cacheSize: _aiCache.size,
+    groqAvailable: !!process.env.GROQ_API_KEY,
+    keys: keyStatuses,
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════
@@ -822,6 +1038,44 @@ const networkInterfaces = os.networkInterfaces();
 const localIP = Object.values(networkInterfaces)
   .flat()
   .find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🗄️  /api/db/* — 서버사이드 DB 프록시 (Supabase 키는 서버에서만 관리)
+//    클라이언트가 직접 Supabase에 접근하지 않고 이 엔드포인트를 통해 처리
+// ═══════════════════════════════════════════════════════════════════════
+app.get('/api/db/:collection', requireAuth, (req, res) => {
+  const { collection } = req.params;
+  const data = getCollection(collection, null);
+  res.json({ success: true, data });
+});
+
+app.post('/api/db/:collection', requireAuth, (req, res) => {
+  const { collection } = req.params;
+  const { data } = req.body;
+  if (data === undefined) return res.status(400).json({ success: false, error: 'data 필드 필요' });
+  setCollection(collection, data);
+  res.json({ success: true });
+});
+
+app.put('/api/db/:collection', requireAuth, (req, res) => {
+  const { collection } = req.params;
+  const { item } = req.body;
+  if (!item) return res.status(400).json({ success: false, error: 'item 필드 필요' });
+  const existing = getCollection(collection, []);
+  if (Array.isArray(existing)) { existing.push(item); setCollection(collection, existing); }
+  res.json({ success: true });
+});
+
+app.delete('/api/db/:collection/:id', requireAuth, (req, res) => {
+  const { collection, id } = req.params;
+  const existing = getCollection(collection, []);
+  if (Array.isArray(existing)) {
+    const filtered = existing.filter(item => String(item.id) !== String(id));
+    setCollection(collection, filtered);
+  }
+  res.json({ success: true });
+});
 
 app.listen(PORT, () => {
   console.log('\n╔══════════════════════════════════════════════════════╗');

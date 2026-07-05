@@ -1,168 +1,108 @@
 /**
- * ☁️ cloudDB.js — SaaS 핵심 모듈 1: Supabase 클라우드 DB 연동
+ * ☁️ cloudDB.js — 클라이언트 DB 레이어 (보안 강화 버전)
  *
- * 목적: LocalStorage 저장 방식에서 진짜 AWS 호스팅 Supabase (PostgreSQL)
- *       클라우드 데이터베이스와 실시간으로 데이터를 동기화합니다.
+ * ⚠️ 보안 변경사항:
+ *   Supabase URL/Key를 클라이언트에서 완전 제거.
+ *   모든 데이터 요청은 서버(/api/db/*)를 통해서만 처리.
+ *   서버가 Supabase와 직접 통신 → API 키는 .env에서만 관리.
+ *
+ * 데이터 흐름:
+ *   [Browser] → [서버 /api/db/*] → [Supabase PostgreSQL]
+ *                (JWT 인증 통과 시에만 허용)
  */
 
 window.CloudDB = (() => {
-  const SUBAPASE_URL = 'https://nnebupmxmbrjmxsnvstj.supabase.co';
-  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5uZWJ1cG14bWJyam14c252c3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5Nzc3ODgsImV4cCI6MjA5ODU1Mzc4OH0.NsYIxdXtdKoCTKKcDsCuJyR8uTU-T1oh4Ht3kQmz6WM';
 
-  // Supabase 클라이언트 초기화
-  let supabase = null;
-  if (window.supabase && window.supabase.createClient) {
-    supabase = window.supabase.createClient(SUBAPASE_URL, SUPABASE_KEY);
-  } else {
-    console.error('[CloudDB] Supabase SDK가 아직 로드되지 않았습니다.');
+  // ── LocalStorage 폴백 (서버 없는 경우) ──────────────────────────────
+  function _lsKey(collection) {
+    return `oneoffice_ANTIGRAVITY_v1_${collection}`;
   }
 
-  // LocalStorage 호환을 위한 매핑 정보
-  const TABLE_MAP = {
-    'employees': 'employees',
-    'welfarePoints': 'welfare_points',
-    'chatLogs': 'chat_logs',
-    'registryEvents': 'registry_events',
-    'fleaMarketItems': 'flea_market_items',
-    'reports': 'reports',
-    'securityLogs': 'security_logs'
-  };
+  function _lsGet(collection, defaultValue) {
+    try {
+      const raw = localStorage.getItem(_lsKey(collection));
+      return raw ? JSON.parse(raw) : defaultValue;
+    } catch { return defaultValue; }
+  }
+
+  function _lsSet(collection, data) {
+    try {
+      localStorage.setItem(_lsKey(collection), JSON.stringify(data));
+      return true;
+    } catch { return false; }
+  }
+
+  function _lsRemove(collection, id) {
+    try {
+      const data = _lsGet(collection, []);
+      if (Array.isArray(data)) {
+        const filtered = data.filter(item => item.id !== id);
+        _lsSet(collection, filtered);
+      }
+      return true;
+    } catch { return false; }
+  }
+
+  // ── 서버 프록시 호출 (JWT 자동 첨부) ────────────────────────────────
+  async function _serverCall(method, collection, payload = null) {
+    const token = sessionStorage.getItem('oneoffice_jwt');
+    if (!token) return null; // 로그인 전 → LocalStorage fallback
+
+    try {
+      const opts = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      };
+      if (payload && method !== 'GET') opts.body = JSON.stringify(payload);
+
+      const res = await fetch(`/api/db/${collection}`, opts);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null; // 서버 오류 → LocalStorage fallback
+    }
+  }
 
   return {
-    client: supabase,
-
-    // ── Read (실시간 비동기 조회) ────────────────────────────────────
+    // ── Read ──────────────────────────────────────────────────────────
     async get(collection, defaultValue = null) {
-      if (!supabase) return defaultValue;
-      const table = TABLE_MAP[collection];
-      if (!table) return defaultValue;
-
-      try {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*');
-
-        if (error) throw error;
-
-        // welfarePoints의 경우 { "1": 1000000, "2": 850000 } 포맷으로 가공
-        if (collection === 'welfarePoints') {
-          const formatted = {};
-          data.forEach(row => {
-            formatted[String(row.user_id)] = row.balance;
-          });
-          return formatted;
-        }
-
-        // chatLogs의 경우 target별로 그룹핑하여 { group: [], bot: [] } 포맷 제공
-        if (collection === 'chatLogs') {
-          const formatted = {};
-          data.forEach(row => {
-            if (!formatted[row.target]) formatted[row.target] = [];
-            formatted[row.target].push({
-              sender: row.sender,
-              senderName: row.sender_name,
-              text: row.text
-            });
-          });
-          return formatted;
-        }
-
-        // 일반 배열 반환 (ID 정렬)
-        return data.sort((a, b) => a.id - b.id) || defaultValue;
-      } catch (e) {
-        console.warn(`[Supabase Read Error] ${collection}:`, e);
-        return defaultValue;
-      }
+      // 서버 시도 → 실패 시 LocalStorage fallback
+      const serverData = await _serverCall('GET', collection);
+      if (serverData?.data !== undefined) return serverData.data;
+      return _lsGet(collection, defaultValue);
     },
 
-    // ── Write / Update (단일 데이터 추가/수정) ────────────────────────
+    // ── Write / Update ────────────────────────────────────────────────
     async set(collection, data) {
-      if (!supabase) return false;
-      const table = TABLE_MAP[collection];
-      if (!table) return false;
-
-      try {
-        // 복지 포인트 일괄 업데이트 처리
-        if (collection === 'welfarePoints') {
-          const promises = Object.entries(data).map(([userId, balance]) => {
-            return supabase
-              .from('welfare_points')
-              .upsert({ user_id: Number(userId), balance });
-          });
-          await Promise.all(promises);
-          return true;
-        }
-
-        // 일반 배열 저장
-        if (Array.isArray(data)) {
-          const promises = data.map(item => {
-            const row = { ...item };
-            // 객체 Key 포맷 변환 (camelCase -> snake_case)
-            if (row.joinDate !== undefined) { row.join_date = row.joinDate; delete row.joinDate; }
-            if (row.workStyle !== undefined) { row.work_style = row.workStyle; delete row.workStyle; }
-            if (row.employeeId !== undefined) { row.employee_id = row.employeeId; delete row.employeeId; }
-            if (row.employeeName !== undefined) { row.employee_name = row.employeeName; delete row.employeeName; }
-            if (row.eventTitle !== undefined) { row.event_title = row.eventTitle; delete row.eventTitle; }
-            if (row.isToday !== undefined) { row.is_today = row.isToday; delete row.isToday; }
-            if (row.sellerId !== undefined) { row.seller_id = row.sellerId; delete row.sellerId; }
-            if (row.sellerName !== undefined) { row.seller_name = row.sellerName; delete row.sellerName; }
-            return supabase.from(table).upsert(row);
-          });
-          await Promise.all(promises);
-          return true;
-        }
-
-        return false;
-      } catch (e) {
-        console.error(`[Supabase Write Error] ${collection}:`, e);
-        return false;
-      }
+      // LocalStorage에 즉시 저장 (오프라인 대응)
+      _lsSet(collection, data);
+      // 서버에도 비동기 동기화 (실패해도 무시)
+      await _serverCall('POST', collection, { data }).catch(() => {});
+      return true;
     },
 
-    // ── Array push (데이터 즉시 insert) ─────────────────────────────
+    // ── Push (단일 항목 추가) ─────────────────────────────────────────
     async push(collection, item) {
-      if (!supabase) return false;
-      const table = TABLE_MAP[collection];
-      if (!table) return false;
-
-      try {
-        const row = { ...item };
-        // camelCase -> snake_case 키 변환
-        if (row.senderName) { row.sender_name = row.senderName; delete row.senderName; }
-        if (row.employeeId) { row.employee_id = row.employeeId; delete row.employeeId; }
-        if (row.employeeName) { row.employee_name = row.employeeName; delete row.employeeName; }
-        if (row.eventTitle) { row.event_title = row.eventTitle; delete row.eventTitle; }
-        if (row.isToday !== undefined) { row.is_today = row.isToday; delete row.isToday; }
-        if (row.sellerId) { row.seller_id = row.sellerId; delete row.sellerId; }
-        if (row.sellerName) { row.seller_name = row.sellerName; delete row.sellerName; }
-
-        const { error } = await supabase.from(table).insert(row);
-        if (error) throw error;
-        return true;
-      } catch (e) {
-        console.error(`[Supabase Push Error] ${collection}:`, e);
-        return false;
+      const existing = _lsGet(collection, []);
+      if (Array.isArray(existing)) {
+        existing.push(item);
+        _lsSet(collection, existing);
       }
+      await _serverCall('PUT', collection, { item }).catch(() => {});
+      return true;
     },
 
-    // ── 데이터 삭제 ─────────────────────────────────────────────────
+    // ── Remove ────────────────────────────────────────────────────────
     async remove(collection, id) {
-      if (!supabase) return false;
-      const table = TABLE_MAP[collection];
-      if (!table) return false;
+      _lsRemove(collection, id);
+      await _serverCall('DELETE', `${collection}/${id}`).catch(() => {});
+      return true;
+    },
 
-      try {
-        const { error } = await supabase
-          .from(table)
-          .delete()
-          .eq('id', id);
-
-        if (error) throw error;
-        return true;
-      } catch (e) {
-        console.error(`[Supabase Delete Error] ${collection}:`, e);
-        return false;
-      }
-    }
+    // ── 호환성: 클라이언트 (Supabase SDK 없음) ───────────────────────
+    client: null,
   };
 })();
