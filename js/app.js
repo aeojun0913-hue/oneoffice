@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🚀 app.js — OneOffice 앱 부트스트랩 & 전역 상태 조율 (Entry Point)
  *
  * 역할:
@@ -396,6 +396,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.registryEvents  = data.registryEvents  || [];
     AppState.reports         = data.reports         || [];
     AppState.securityLogs    = data.securityLogs    || [];
+    AppState.approvals       = data.approvals       || [];
   }
 
   // ── 2. 테마 조절 초기화 (시력 보호용 화이트 모드 토글) ──────────────
@@ -1121,11 +1122,34 @@ function _initAIOffice() {
   const printDraftBtn = document.getElementById('printDraftBtn');
 
   if (genDraftBtn && draftDocType && draftSituation && draftOutput) {
-    // 퀵 프롬프트 예제 클릭 리스너 연결
+    // 문서 템플릿 버튼 클릭 리스너
+    document.querySelectorAll('#ai-draft .ai-doc-template').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type   = btn.dataset.type;
+        const prompt = btn.dataset.prompt;
+        if (draftDocType) draftDocType.value = type;
+        if (draftSituation) {
+          const user = AppState.currentUser;
+          const today = new Date().toLocaleDateString('ko-KR');
+          const fills = {
+            '연차신청서': `신청일: ${today}\n신청 기간: (날짜 입력)\n일수: (일수 입력)\n사유: 개인 사정\n업무 인수인계자: (담당자 입력)`,
+            '반차신청서': `신청일: ${today}\n반차 유형: 오전/오후 선택\n사유: 개인 사정`,
+            '재택근무신청': `신청일: ${today}\n재택 날짜: (날짜 입력)\n업무 계획: (주요 업무 입력)`,
+            '출장신청서': `목적지: \n출장 기간: \n목적: \n예상 비용: 원\n교통편: `,
+            '품의서': `구매 항목: \n수량/금액: \n구매 목적: \n예산 출처: `,
+            '경위서': `발생 일시: ${today}\n발생 내용: \n원인 분석: \n재발 방지 대책: `,
+          };
+          draftSituation.value = fills[type] || prompt;
+        }
+        window.showToast('📋 템플릿 선택', type + ' 양식이 준비됐습니다.', 'success');
+      });
+    });
+
+    // 기존 quick-prompt-btn도 지원
     document.querySelectorAll('#ai-draft .quick-prompt-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const prompt = btn.getAttribute('data-prompt');
-        const type = btn.getAttribute('data-type');
+        const type   = btn.getAttribute('data-type');
         if (draftDocType) draftDocType.value = type;
         if (draftSituation) draftSituation.value = prompt;
       });
@@ -1145,15 +1169,27 @@ function _initAIOffice() {
 문서 번호, 기안 일자, 기안자(홍길동 대리), 제목, 기안 목적, 세부 상세 내역, 예산/비용 처리가 포함된 정형화된 공문서 규격에 알맞게 작성해줘.\n상황 설명:\n${sit}`;
         const aiText = await MockAPI.generateWithAI(prompt);
         draftOutput.innerHTML = `
-          <div style="padding:20px; border:1px solid var(--border-color); border-radius:8px; background:rgba(255,255,255,0.01); font-family:monospace; white-space:pre-wrap; font-size:0.85rem; line-height:1.8;">
-            ${aiText}
-          </div>
-          <div style="margin-top:14px; display:flex; justify-content:flex-end;">
-            <button class="btn-primary" style="padding:6px 12px; font-size:0.78rem;" onclick="window.showToast('📄 상신 완료', 'AI가 작성한 기안서가 결재 문서함으로 연동 상신되었습니다.', 'success')"><i class="fa-solid fa-file-export"></i> 결재선 연동 상신</button>
-          </div>
+          <div id="aiDraftContent" style="padding:20px;border:1px solid var(--border-color);border-radius:8px;background:rgba(255,255,255,0.01);font-family:monospace;white-space:pre-wrap;font-size:0.85rem;line-height:1.8;">${aiText}</div>
         `;
+        // 결재 요청 버튼 표시
+        const submitBtn = document.getElementById('submitDraftApprovalBtn');
+        if (submitBtn) {
+          submitBtn.style.display = 'inline-flex';
+          submitBtn.onclick = () => {
+            const user = AppState.currentUser;
+            const approverMap = {1:null,2:1,3:1,4:2,5:2,6:2};
+            const approverId  = approverMap[user?.id] ?? 2;
+            window._createApproval({
+              type: 'document',
+              title: `[${type}] ${draftSituation.value.substring(0,40)}`,
+              content: aiText,
+              approverId,
+              reason: draftSituation.value,
+            });
+          };
+        }
         if (printDraftBtn) printDraftBtn.style.display = 'inline-block';
-        window.showToast('🤖 AI 기안서 완성', '기안 초안 작성이 완료되었습니다.', 'success');
+        window.showToast('🤖 AI 문서 완성', type + ' 초안 작성이 완료됐습니다. 결재를 요청하세요!', 'success');
       } catch (err) {
         draftOutput.innerHTML = '<div style="color:var(--danger);">초안 생성 도중 오류가 발생했습니다.</div>';
       } finally {
@@ -1362,13 +1398,21 @@ function _initAttendance() {
 
 // 결재 탭 초기화
 function _initApproval() {
-  const form = document.getElementById('approvalForm') || document.querySelector('#approval form');
-  if (form) {
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      window.showToast('📄 결재 상신 완료', '결재 문서가 상신되었습니다.', 'success');
+  _loadApprovals();
+
+  document.querySelectorAll('.apr-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.aprtab;
+      document.querySelectorAll('.apr-tab-btn').forEach(b => {
+        b.style.color = 'var(--text-muted)';
+        b.style.borderBottomColor = 'transparent';
+      });
+      btn.style.color = 'var(--primary)';
+      btn.style.borderBottomColor = 'var(--primary)';
+      document.getElementById('aprPanelPending').style.display = tab === 'pending' ? 'block' : 'none';
+      document.getElementById('aprPanelMine').style.display    = tab === 'mine'    ? 'block' : 'none';
     });
-  }
+  });
 }
 
 // 업무 보고 탭 초기화
@@ -2383,3 +2427,117 @@ function _initAICopilot() {
   sendBtn.addEventListener('click', () => _processCommand(input.value));
   input.addEventListener('keypress', e => { if (e.key === 'Enter') _processCommand(input.value); });
 }
+
+
+// ══════════════════════════════════════════════════════════════════
+// ✅ 결재함 모듈 (실제 워크플로우)
+// ══════════════════════════════════════════════════════════════════
+
+async function _loadApprovals() {
+  const user = AppState.currentUser;
+  if (!user) return;
+  try {
+    const token = localStorage.getItem('oo_token');
+    const res = await fetch('/api/approvals?employeeId=' + user.id, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    AppState.approvals = data;
+    _renderApprovals(data);
+  } catch(e) {
+    console.warn('[Approval] 로드 실패:', e.message);
+    _renderApprovals({ pending: [], mine: [] });
+  }
+}
+
+function _renderApprovals(data) {
+  const { pending = [], mine = [] } = data;
+  const elPending = document.getElementById('aprBadgePending');
+  const elMine    = document.getElementById('aprBadgeMine');
+  if (elPending) elPending.textContent = '⏳ 처리 대기 ' + pending.length + '건';
+  if (elMine)    elMine.textContent    = '📋 내 요청 ' + mine.length + '건';
+
+  const renderList = (items, isApprover, containerId) => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (items.length === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">처리할 결재가 없습니다 ✅</div>';
+      return;
+    }
+    const statusMap = {
+      pending:  { label:'⏳ 대기중', color:'var(--warning)' },
+      approved: { label:'✅ 승인됨', color:'var(--success)' },
+      rejected: { label:'❌ 반려됨', color:'#ef4444' },
+    };
+    el.innerHTML = items.map(a => {
+      const s  = statusMap[a.status] || statusMap.pending;
+      const dt = new Date(a.createdAt).toLocaleDateString('ko-KR');
+      const actionBtns = isApprover && a.status === 'pending' ? `
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input id="cmt_${a.id}" class="form-control" placeholder="반려 사유" style="flex:1;padding:7px 10px;font-size:0.8rem;">
+          <button onclick="window._approvalAction('${a.id}','approve')" style="padding:7px 16px;background:var(--success);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">✅ 승인</button>
+          <button onclick="window._approvalAction('${a.id}','reject')" style="padding:7px 16px;background:#ef4444;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">❌ 반려</button>
+        </div>` : '';
+      const comment = a.comment ? `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:6px;font-size:0.8rem;color:var(--text-muted);">💬 ${a.comment}</div>` : '';
+      return `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-color);border-radius:12px;padding:16px 20px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:0.75rem;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.06);color:${s.color};">${s.label}</span>
+          <span style="font-size:0.72rem;color:var(--text-muted);">${dt}</span>
+        </div>
+        <div style="font-weight:700;margin-bottom:4px;">${a.title}</div>
+        <div style="font-size:0.8rem;color:var(--text-muted);">${isApprover ? '요청자: '+a.employeeName : '결재자: '+a.approverName}${a.start ? ' | '+a.start+(a.end&&a.end!==a.start?' ~ '+a.end:'') : ''}</div>
+        ${a.reason ? '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">사유: '+a.reason+'</div>' : ''}
+        ${comment}
+        ${actionBtns}
+      </div>`;
+    }).join('');
+  };
+
+  renderList(pending, true,  'aprPendingList');
+  renderList(mine,    false, 'aprMineList');
+}
+
+window._approvalAction = async function(id, action) {
+  const comment = document.getElementById('cmt_' + id)?.value || '';
+  const token   = localStorage.getItem('oo_token');
+  try {
+    const res  = await fetch('/api/approvals/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ action, comment }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      const label = action === 'approve' ? '승인' : '반려';
+      if (window.showToast) window.showToast('결재 ' + label, data.approval.title + ' ' + label + ' 처리됐습니다.', action === 'approve' ? 'success' : 'danger');
+      if (action === 'approve' && data.approval.type === 'leave') {
+        if (!AppState.events) AppState.events = [];
+        AppState.events.push({ id:'evt_'+Date.now(), title:data.approval.title, start:data.approval.start, end:data.approval.end||data.approval.start, type:'leave', color:data.approval.color||'#a855f7', employeeId:data.approval.employeeId, leaveDays:data.approval.leaveDays });
+        if (window.CalendarModule) window.CalendarModule.render();
+        if (typeof window.updateUIForCurrentUser === 'function') window.updateUIForCurrentUser();
+      }
+      await _loadApprovals();
+    }
+  } catch(e) { console.warn('[Approval] 처리 실패:', e); }
+};
+
+window._createApproval = async function(approvalData) {
+  const user  = AppState.currentUser;
+  const token = localStorage.getItem('oo_token');
+  const approverMap = {1:null,2:1,3:1,4:2,5:2,6:2};
+  const approverId  = approverMap[user?.id] ?? 2;
+  try {
+    const res  = await fetch('/api/approvals', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', Authorization:'Bearer '+token},
+      body: JSON.stringify({...approvalData, employeeId:user?.id, approverId}),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (window.showToast) window.showToast('결재 요청', approvalData.title + ' 결재가 요청됐습니다! ✅', 'success');
+      const aprNav = document.querySelector('[data-tab="approval"]');
+      if (aprNav) aprNav.click();
+    }
+  } catch(e) { console.warn('[Approval] 생성 실패:', e); }
+};

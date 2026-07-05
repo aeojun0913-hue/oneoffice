@@ -119,24 +119,21 @@ function _getDefaultDB() {
       const y = new Date().getFullYear();
       const m = String(new Date().getMonth() + 1).padStart(2, '0');
       return [
-        // Jane Doe (id:1) — 대표이사
         { id:'ev_j1', title:'Jane Doe [연차]',   start:`${y}-${m}-08`, end:`${y}-${m}-09`, type:'leave', color:'#6366f1', employeeId:1, leaveDays:2 },
         { id:'ev_j2', title:'Jane Doe [출장]',   start:`${y}-${m}-20`, end:`${y}-${m}-21`, type:'leave', color:'#f97316', employeeId:1, leaveDays:0 },
-        // John Smith (id:2) — CTO
         { id:'ev_s1', title:'John Smith [병가]',  start:`${y}-${m}-03`, end:`${y}-${m}-03`, type:'leave', color:'#ef4444', employeeId:2, leaveDays:1 },
         { id:'ev_s2', title:'John Smith [재택근무]',start:`${y}-${m}-14`, end:`${y}-${m}-14`, type:'leave', color:'#3b82f6', employeeId:2, leaveDays:0 },
-        // Anna Lee (id:3) — HR
         { id:'ev_a1', title:'Anna Lee [오전반차]', start:`${y}-${m}-10`, end:`${y}-${m}-10`, type:'leave', color:'#06b6d4', employeeId:3, leaveDays:0.5 },
         { id:'ev_a2', title:'Anna Lee [경조사휴가]',start:`${y}-${m}-25`, end:`${y}-${m}-26`, type:'leave', color:'#f59e0b', employeeId:3, leaveDays:2 },
-        // 홍길동 (id:4) — 개발팀장
         { id:'ev_h1', title:'홍길동 [연차]',      start:`${y}-${m}-06`, end:`${y}-${m}-07`, type:'leave', color:'#a855f7', employeeId:4, leaveDays:2 },
         { id:'ev_h2', title:'홍길동 [반차]',      start:`${y}-${m}-15`, end:`${y}-${m}-15`, type:'leave', color:'#06b6d4', employeeId:4, leaveDays:0.5 },
-        // 김태희 (id:5)
         { id:'ev_k1', title:'김태희 [재택근무]',   start:`${y}-${m}-12`, end:`${y}-${m}-12`, type:'leave', color:'#3b82f6', employeeId:5, leaveDays:0 },
-        // 이민정 (id:6)
         { id:'ev_i1', title:'이민정 [연차]',      start:`${y}-${m}-18`, end:`${y}-${m}-18`, type:'leave', color:'#10b981', employeeId:6, leaveDays:1 },
       ];
     })(),
+
+    // 결재함
+    [`oneoffice_${TENANT_ID}_v1_approvals`]: [],
 
     [`oneoffice_${TENANT_ID}_v1_chatLogs`]: {
       group: [
@@ -765,6 +762,7 @@ app.get('/api/state', requireAuth, (req, res) => {
     registryEvents:  db[_tKey('registryEvents')]  || [],
     reports:         db[_tKey('reports')]         || [],
     securityLogs:    db[_tKey('securityLogs')]    || [],
+    approvals:       db[_tKey('approvals')]       || [],
     tenantId: TENANT_ID,
     requestedBy: req.user?.name,
     servedAt: new Date().toISOString(),
@@ -793,29 +791,136 @@ app.post('/api/chats', requireAuth, (req, res) => {
 // 📅 캘린더 & 연차 API (JWT 인증)
 // ══════════════════════════════════════════════════════════════════════
 app.post('/api/calendar', requireAuth, (req, res) => {
-  const { title, start, end, type, color, employeeId, leaveDays } = req.body;
+  const { title, start, end, type, color, employeeId, leaveDays, reason, skipApproval } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
-  const events = getCollection('calendarEvents', []);
-  const newEvent = { id: String(Date.now()), title, start, end: end || start, type, color };
-  events.push(newEvent);
-  setCollection('calendarEvents', events);
-
-  // 연차 차감
-  if (type === 'leave' && employeeId) {
-    const employees = getCollection('employees', []);
-    const emp = employees.find(e => e.id === Number(employeeId));
-    if (emp) {
-      const match    = (emp.status || '').match(/\d+(\.\d+)?/);
-      const current  = match ? parseFloat(match[0]) : 15;
-      const newLeave = Math.max(0, current - (leaveDays || 1));
-      emp.status     = `${newLeave}일의 여유 휴가 보유 중 ✈️`;
-      setCollection('employees', employees);
-    }
+  // 연차/병가/반차 등 leave 타입은 결재 대기로 전환 (skipApproval=true면 즉시 등록)
+  if (type === 'leave' && employeeId && !skipApproval) {
+    const approvals = getCollection('approvals', []);
+    // 결재자 결정: CEO(id:1)는 없음, CTO(id:2)/HR(id:3)은 CEO, 나머지는 CTO
+    const approverMap = { 1: null, 2: 1, 3: 1, 4: 2, 5: 2, 6: 2 };
+    const approverId = approverMap[Number(employeeId)] ?? 2;
+    const employees  = getCollection('employees', []);
+    const requester  = employees.find(e => e.id === Number(employeeId));
+    const approver   = employees.find(e => e.id === approverId);
+    const newApproval = {
+      id: 'apr_' + Date.now(),
+      type: 'leave',
+      title,
+      start,
+      end: end || start,
+      color,
+      employeeId: Number(employeeId),
+      employeeName: requester?.name || '직원',
+      leaveDays: leaveDays || 1,
+      reason: reason || '',
+      approverId,
+      approverName: approver?.name || '팀장',
+      status: 'pending',   // pending | approved | rejected
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      comment: '',
+    };
+    approvals.push(newApproval);
+    setCollection('approvals', approvals);
+    logSecurity(req.user.name, ip, '결재 요청', `${title} (${start} ~ ${end||start}) → 대기중`);
+    return res.json({ success: true, approval: newApproval, pending: true });
   }
 
-  logSecurity(req.user.name, ip, '휴가 신청', `${title} (${start} ~ ${end})`);
-  res.json({ success: true, event: newEvent });
+  // 즉시 등록 (비-leave 타입 또는 skipApproval)
+  const events = getCollection('calendarEvents', []);
+  const newEvent = { id: 'evt_' + Date.now(), title, start, end: end || start, type, color, employeeId: Number(employeeId), leaveDays };
+  events.push(newEvent);
+  setCollection('calendarEvents', events);
+  logSecurity(req.user.name, ip, '일정 등록', `${title} (${start})`);
+  res.json({ success: true, event: newEvent, pending: false });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// ✅ 결재 API (JWT 인증)
+// ══════════════════════════════════════════════════════════════════════
+
+/** 결재 목록 조회: 내가 요청한 것 + 내가 처리해야 할 것 */
+app.get('/api/approvals', requireAuth, (req, res) => {
+  const { employeeId } = req.query;
+  const approvals = getCollection('approvals', []);
+  const myId = Number(employeeId);
+  res.json({
+    mine:    approvals.filter(a => a.employeeId === myId),
+    pending: approvals.filter(a => a.approverId === myId && a.status === 'pending'),
+    all:     approvals,
+  });
+});
+
+/** 결재 생성 (AI 문서에서 직접 요청) */
+app.post('/api/approvals', requireAuth, (req, res) => {
+  const approvals = getCollection('approvals', []);
+  const employees = getCollection('employees', []);
+  const { type, title, content, employeeId, approverId, start, end, leaveDays, reason, color } = req.body;
+  const requester = employees.find(e => e.id === Number(employeeId));
+  const approver  = employees.find(e => e.id === Number(approverId));
+  const newApproval = {
+    id: 'apr_' + Date.now(),
+    type: type || 'document',
+    title, content: content || '',
+    start, end, leaveDays, reason, color,
+    employeeId: Number(employeeId),
+    employeeName: requester?.name || '직원',
+    approverId: Number(approverId),
+    approverName: approver?.name || '팀장',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    comment: '',
+  };
+  approvals.push(newApproval);
+  setCollection('approvals', approvals);
+  res.json({ success: true, approval: newApproval });
+});
+
+/** 결재 승인 / 반려 */
+app.put('/api/approvals/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { action, comment } = req.body;  // action: 'approve' | 'reject'
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const approvals = getCollection('approvals', []);
+  const idx = approvals.findIndex(a => a.id === id);
+  if (idx < 0) return res.status(404).json({ error: '결재 건을 찾을 수 없습니다.' });
+
+  const apr = approvals[idx];
+  apr.status    = action === 'approve' ? 'approved' : 'rejected';
+  apr.comment   = comment || '';
+  apr.updatedAt = new Date().toISOString();
+  apr.approvedBy = req.user.name;
+  approvals[idx] = apr;
+  setCollection('approvals', approvals);
+
+  // 승인 시 캘린더 자동 등록 + 연차 차감
+  if (action === 'approve' && apr.type === 'leave') {
+    const events = getCollection('calendarEvents', []);
+    events.push({
+      id: 'evt_' + Date.now(),
+      title: apr.title, start: apr.start, end: apr.end || apr.start,
+      type: 'leave', color: apr.color || '#a855f7',
+      employeeId: apr.employeeId, leaveDays: apr.leaveDays,
+    });
+    setCollection('calendarEvents', events);
+
+    // 연차 차감
+    const employees = getCollection('employees', []);
+    const emp = employees.find(e => e.id === apr.employeeId);
+    if (emp && apr.leaveDays > 0) {
+      const match   = (emp.status || '').match(/\d+(\.\d+)?/);
+      const current = match ? parseFloat(match[0]) : 15;
+      emp.status    = `${Math.max(0, current - apr.leaveDays)}일의 여유 휴가 보유 중 ✈️`;
+      setCollection('employees', employees);
+    }
+    logSecurity(req.user.name, ip, '결재 승인', `${apr.title} 승인 → 캘린더 자동 등록`);
+  } else {
+    logSecurity(req.user.name, ip, '결재 ' + (action === 'approve' ? '승인' : '반려'), apr.title);
+  }
+
+  res.json({ success: true, approval: apr });
 });
 
 // ══════════════════════════════════════════════════════════════════════

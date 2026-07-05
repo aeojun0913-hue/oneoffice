@@ -533,21 +533,7 @@
   </div>
 
   <!-- ========== MOOD CHECK POPUP ========== -->
-  <div class="modal-overlay" id="moodCheckModal">
-    <div class="modal-content glass" style="max-width: 420px; text-align: center;">
-      <div style="font-size: 2rem; margin-bottom: 12px;">✨</div>
-      <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 8px;">오늘 기분이 어때요?</h3>
-      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;">익명으로 기록됩니다. 솔직하게 선택해주세요!</p>
-      <div style="display: flex; justify-content: center; gap: 16px;">
-        <button class="mood-btn" data-mood="great" title="너무 좋아요!">😄<span>최고</span></button>
-        <button class="mood-btn" data-mood="good" title="좋아요">😊<span>좋음</span></button>
-        <button class="mood-btn" data-mood="neutral" title="보통이에요">😐<span>보통</span></button>
-        <button class="mood-btn" data-mood="tired" title="피곤해요">😪<span>피곤</span></button>
-        <button class="mood-btn" data-mood="bad" title="힘들어요">😢<span>힘듦</span></button>
-      </div>
-      <button class="btn-secondary" style="margin-top: 20px; width: 100%; padding: 10px;" id="moodSkipBtn">나중에 입력할게요</button>
-    </div>
-  </div>
+  
 
   <!-- ========== CLUB JOIN CONFIRM MODAL ========== -->
   <div class="modal-overlay" id="clubJoinModal">
@@ -592,8 +578,8 @@
       <div class="nav-group-label">급여 / 복지</div>
       <a class="nav-item" data-tab="payroll"><i class="fa-solid fa-wallet"></i><span>급여 시스템</span></a>
       <a class="nav-item" data-tab="welfare"><i class="fa-solid fa-gift"></i><span>복지 포털</span><span class="nav-badge" style="background:var(--success);">HOT</span></a>
-      <a class="nav-item" data-tab="fleamarket"><i class="fa-solid fa-store"></i><span>사내 플리마켓</span></a>
-      <a class="nav-item" data-tab="registry"><i class="fa-solid fa-heart"></i><span>경조사</span></a>
+      
+      
 
       <!-- AI / 관리 -->
       <div class="nav-divider"></div>
@@ -1097,36 +1083,53 @@
 
       <!-- AI Draft Sub-Tab -->
       <div class="ai-sub-content" id="ai-draft">
-        <div class="reports-grid" style="align-items: start;">
-          <div class="glass" style="padding: 24px; display:flex; flex-direction:column; gap:14px;">
-            <h3 class="card-title"><i class="fa-solid fa-pen-nib" style="color:var(--warning);"></i> AI 결재 문서 초안 작성기</h3>
+        <div class="reports-grid" style="align-items:start;">
+
+          <!-- 왼쪽: 문서 작성 패널 -->
+          <div class="glass" style="padding:24px;display:flex;flex-direction:column;gap:14px;">
+            <h3 class="card-title"><i class="fa-solid fa-pen-nib" style="color:var(--warning);"></i> AI 문서 작성 + 결재 요청</h3>
+
+            <!-- 빠른 템플릿 버튼 -->
+            <div>
+              <label style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;display:block;">📋 빠른 템플릿</label>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                <button class="ai-doc-template" data-type="연차신청서" data-prompt="연차 휴가 신청서" style="padding:6px 12px;border-radius:20px;border:1px solid var(--primary);background:rgba(99,102,241,0.1);color:var(--primary);cursor:pointer;font-size:0.78rem;">🏖️ 연차신청서</button>
+                <button class="ai-doc-template" data-type="반차신청서" data-prompt="오전/오후 반차 신청서" style="padding:6px 12px;border-radius:20px;border:1px solid var(--secondary);background:rgba(6,182,212,0.1);color:var(--secondary);cursor:pointer;font-size:0.78rem;">🌗 반차신청서</button>
+                <button class="ai-doc-template" data-type="재택근무신청" data-prompt="재택근무 신청서" style="padding:6px 12px;border-radius:20px;border:1px solid var(--success);background:rgba(16,185,129,0.1);color:var(--success);cursor:pointer;font-size:0.78rem;">🏠 재택근무</button>
+                <button class="ai-doc-template" data-type="출장신청서" data-prompt="출장 계획 및 비용 신청서" style="padding:6px 12px;border-radius:20px;border:1px solid var(--warning);background:rgba(245,158,11,0.1);color:var(--warning);cursor:pointer;font-size:0.78rem;">✈️ 출장신청</button>
+                <button class="ai-doc-template" data-type="품의서" data-prompt="예산 집행 품의서" style="padding:6px 12px;border-radius:20px;border:1px solid var(--accent);background:rgba(168,85,247,0.1);color:var(--accent);cursor:pointer;font-size:0.78rem;">💰 품의서</button>
+                <button class="ai-doc-template" data-type="경위서" data-prompt="사건 경위 및 처리 보고서" style="padding:6px 12px;border-radius:20px;border:1px solid #ef4444;background:rgba(239,68,68,0.1);color:#ef4444;cursor:pointer;font-size:0.78rem;">📋 경위서</button>
+              </div>
+            </div>
+
+            <!-- 선택된 문서 타입 표시 -->
             <div class="form-group">
-              <label>문서 유형 선택</label>
-              <select class="form-control" id="draftDocType">
-                <option value="품의서">품의서 (예산 집행 결재)</option>
-                <option value="기획서">기획서 (사업/프로젝트 계획)</option>
-                <option value="출장보고서">출장 결과 보고서</option>
-                <option value="휴가계">휴가계 (연차 결재)</option>
-                <option value="사유서">사유서</option>
-              </select>
+              <label>문서 유형</label>
+              <input type="text" class="form-control" id="draftDocType" value="연차신청서" style="font-weight:600;">
             </div>
             <div class="form-group">
-              <label>상황 설명</label>
-              <textarea class="form-control" id="draftSituation" rows="5" placeholder="예: 공유 오피스 좌석 모니터 3대 교체로 예산 200만 원 승인 요청"></textarea>
+              <label>내용 입력 (자연어로 설명)</label>
+              <textarea class="form-control" id="draftSituation" rows="4" placeholder="예: 7월 10일~12일 개인 사정으로 연차 3일 신청합니다. 업무 인수인계는 김태희 사원에게 전달 예정입니다."></textarea>
             </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="quick-prompt-btn" data-prompt="공유 오피스 모니터 3대 교체, 예산 200만원 품의서" data-type="품의서">💡 모니터 교체 품의</button>
-              <button class="quick-prompt-btn" data-prompt="2박 3일 부산 고객사 방문 출장 결과 보고" data-type="출장보고서">💡 출장 보고</button>
-            </div>
-            <button class="btn-primary" id="generateDraftBtn"><i class="fa-solid fa-robot"></i> AI 초안 3초 생성</button>
+            <button class="btn-primary" id="generateDraftBtn" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+              <i class="fa-solid fa-robot"></i> AI 문서 초안 생성
+            </button>
           </div>
-          <div class="glass" style="padding: 24px; min-height: 380px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
-              <h3 class="card-title"><i class="fa-solid fa-file-contract" style="color:var(--success);"></i> 생성된 결재 문서 초안</h3>
-              <button class="btn-secondary" id="printDraftBtn" style="padding:8px 14px; font-size:0.8rem; display:none;"><i class="fa-solid fa-print"></i> 인쇄 / PDF</button>
+
+          <!-- 오른쪽: 생성된 문서 + 결재 요청 -->
+          <div class="glass" style="padding:24px;min-height:380px;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <h3 class="card-title"><i class="fa-solid fa-file-contract" style="color:var(--success);"></i> 생성된 문서</h3>
+              <div style="display:flex;gap:8px;">
+                <button class="btn-secondary" id="printDraftBtn" style="padding:7px 14px;font-size:0.8rem;display:none;"><i class="fa-solid fa-print"></i> 인쇄</button>
+                <button class="btn-primary" id="submitDraftApprovalBtn" style="padding:7px 14px;font-size:0.8rem;display:none;background:linear-gradient(135deg,var(--success),var(--secondary));">
+                  <i class="fa-solid fa-paper-plane"></i> 결재 요청
+                </button>
+              </div>
             </div>
-            <div id="draftDocOutput" style="color:var(--text-muted); font-size:0.9rem; line-height: 1.7;"></div>
+            <div id="draftDocOutput" style="color:var(--text-muted);font-size:0.88rem;line-height:1.8;flex:1;"></div>
           </div>
+
         </div>
       </div>
 
@@ -1367,69 +1370,33 @@
 
     <!-- ===== TAB: APPROVAL & DOCS ===== -->
     <section class="tab-content" id="approval">
-      <div style="display:flex; flex-direction:column; gap:20px;">
-        <!-- 결재선 커스터마이징 -->
-        <div class="glass" style="padding:24px;">
-          <div class="feed-header" style="margin-bottom:20px;">
-            <span class="card-title"><i class="fa-solid fa-route" style="color:var(--primary);"></i> 결재선 커스터마이징</span>
-            <span style="font-size:0.8rem; color:var(--text-muted);">^회사별 결재 흐름 설정</span>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="font-size:1.4rem;font-weight:700;color:var(--text-main);margin:0;">✅ 결재함</h2>
+            <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 0;">연차·문서 결재 요청을 처리하고 내 결재 현황을 확인합니다.</p>
           </div>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:16px;">
-            <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:10px; padding:14px; text-align:center;">
-              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">단계 1</div>
-              <div style="font-weight:700; color:white;"><i class="fa-solid fa-pen"></i> 기안자</div>
-              <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">홍길동 대리</div>
-            </div>
-            <div style="color:var(--text-muted); display:flex; align-items:center; justify-content:center; font-size:1.2rem;"><i class="fa-solid fa-arrow-right"></i></div>
-            <div style="background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.2); border-radius:10px; padding:14px; text-align:center;">
-              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">단계 2</div>
-              <div style="font-weight:700; color:white;"><i class="fa-solid fa-user-tie"></i> 팀장 검토</div>
-              <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">John Smith CTO</div>
-            </div>
-            <div style="color:var(--text-muted); display:flex; align-items:center; justify-content:center; font-size:1.2rem;"><i class="fa-solid fa-arrow-right"></i></div>
-            <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:10px; padding:14px; text-align:center;">
-              <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">단계 3</div>
-              <div style="font-weight:700; color:white;"><i class="fa-solid fa-check-double"></i> 대표 승인</div>
-              <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">Jane Doe CEO</div>
-            </div>
+          <div style="display:flex;gap:8px;">
+            <span id="aprBadgePending" style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.3);border-radius:20px;padding:4px 14px;font-size:0.78rem;font-weight:700;">⏳ 처리 대기 0건</span>
+            <span id="aprBadgeMine" style="background:rgba(99,102,241,0.12);color:var(--primary);border:1px solid rgba(99,102,241,0.3);border-radius:20px;padding:4px 14px;font-size:0.78rem;font-weight:700;">📋 내 요청 0건</span>
           </div>
-          <button class="btn-secondary" style="width:100%;" onclick="alert('결재선 변경 시스템은 관리자만 접근 가능합니다. HR 관리자에게 요청해 주세요.');"><i class="fa-solid fa-gear"></i> 결재선 수정 요청</button>
         </div>
-
-        <!-- 문서 보관함 -->
-        <div class="reports-grid" style="align-items:start;">
-          <div class="glass" style="padding:24px;">
-            <div class="feed-header" style="margin-bottom:16px;">
-              <span class="card-title"><i class="fa-solid fa-box-archive" style="color:var(--secondary);"></i> 문서 보관함</span>
-              <input type="text" id="docSearchInput" class="form-control" placeholder="문서 검색..." style="width:160px; padding:6px 10px; font-size:0.8rem;">
-            </div>
-            <div style="display:flex; flex-direction:column; gap:8px;" id="docArchiveList">
-              <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:10px;">
-                <i class="fa-solid fa-file-invoice" style="color:var(--primary); font-size:1.1rem;"></i>
-                <div style="flex:1;"><div style="font-weight:600; font-size:0.88rem;">[2026-06-26] 6월 4주차 주간 업무 보고</div><div style="font-size:0.75rem; color:var(--text-muted);">홍길동 대리 | 업무보고 | 승인완료</div></div>
-                <span style="font-size:0.72rem; padding:3px 8px; border-radius:6px; background:rgba(16,185,129,0.1); color:var(--success); border:1px solid rgba(16,185,129,0.2);">✅ 승인</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:10px;">
-                <i class="fa-solid fa-file-signature" style="color:var(--warning); font-size:1.1rem;"></i>
-                <div style="flex:1;"><div style="font-weight:600; font-size:0.88rem;">[2026-07-01] 모니터 3대 교체 품의서</div><div style="font-size:0.75rem; color:var(--text-muted);">홍길동 대리 | 품의서 | 검토중</div></div>
-                <span style="font-size:0.72rem; padding:3px 8px; border-radius:6px; background:rgba(245,158,11,0.1); color:var(--warning); border:1px solid rgba(245,158,11,0.2);">⏳ 검토중</span>
-              </div>
-              <div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.02); border:1px solid var(--border-color); border-radius:10px;">
-                <i class="fa-solid fa-file-contract" style="color:var(--accent); font-size:1.1rem;"></i>
-                <div style="flex:1;"><div style="font-weight:600; font-size:0.88rem;">[2026-01-02] 홍길동 근로계약서 (전자서명)</div><div style="font-size:0.75rem; color:var(--text-muted);">홍길동 대리 | 근로계약서 | 서명완료</div></div>
-                <span style="font-size:0.72rem; padding:3px 8px; border-radius:6px; background:rgba(168,85,247,0.1); color:var(--accent); border:1px solid rgba(168,85,247,0.2);">🔏 서명완료</span>
-              </div>
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--border-color);">
+          <button class="apr-tab-btn" data-aprtab="pending" id="aprTabPending" style="padding:10px 24px;background:none;border:none;color:var(--primary);font-size:0.88rem;font-weight:700;border-bottom:2px solid var(--primary);cursor:pointer;margin-bottom:-2px;">⏳ 내가 처리할 결재</button>
+          <button class="apr-tab-btn" data-aprtab="mine" id="aprTabMine" style="padding:10px 24px;background:none;border:none;color:var(--text-muted);font-size:0.88rem;font-weight:600;border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-2px;">📋 내가 올린 결재</button>
+        </div>
+        <div id="aprPanelPending">
+          <div id="aprPendingList" style="display:flex;flex-direction:column;gap:12px;">
+            <div style="text-align:center;padding:48px;color:var(--text-muted);">
+              <i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:12px;display:block;opacity:0.4;"></i>처리할 결재가 없습니다
             </div>
           </div>
-          <div class="glass" style="padding:24px; display:flex; flex-direction:column; gap:14px;">
-            <div class="feed-header" style="margin-bottom:4px;">
-              <span class="card-title"><i class="fa-solid fa-file-contract" style="color:var(--accent);"></i> 근로계약서 전자서명</span>
+        </div>
+        <div id="aprPanelMine" style="display:none;">
+          <div id="aprMineList" style="display:flex;flex-direction:column;gap:12px;">
+            <div style="text-align:center;padding:48px;color:var(--text-muted);">
+              <i class="fa-solid fa-file-circle-xmark" style="font-size:2rem;margin-bottom:12px;display:block;opacity:0.4;"></i>요청한 결재가 없습니다
             </div>
-            <p style="color:var(--text-muted); font-size:0.85rem;">신규 입사자 또는 계약 갱신 시 전자서명을 통해 근로계약서를 안전하게 보관합니다.</p>
-            <div class="form-group"><label>직원 선택</label><select class="form-control" id="contractEmpSelect"><option>홍길동 대리</option><option>김태희 사원</option><option>이민정 선임</option></select></div>
-            <div class="form-group"><label>계약 종류</label><select class="form-control"><option>정규직 근로계약서</option><option>계약직 근로계약서</option><option>계약 갱신 합의서</option></select></div>
-            <div class="form-group"><label>계약 시작일</label><input type="date" class="form-control" value="2026-07-01"></div>
-            <button class="btn-primary" id="sendApprovalBtn"><i class="fa-solid fa-pen-to-square"></i> 전자서명 요청 발송</button>
           </div>
         </div>
       </div>
@@ -1672,36 +1639,6 @@
       </div>
     </section>
 
-    <!-- ===== TAB: MARKET ===== -->
-    <section class="tab-content" id="market">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <div>
-          <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">🛍️ 사내 플리마켓</h2>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">임직원 간 투명하고 자유로운 물품 거래 공간입니다.</p>
-        </div>
-        <button class="btn-primary" id="btnOpenRegisterMarket"><i class="fa-solid fa-plus"></i> 물품 등록하기</button>
-      </div>
-
-      <!-- Search & Filters -->
-      <div class="glass" style="padding: 16px; margin-bottom: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 8px; flex-grow: 1; min-width: 250px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px;">
-          <i class="fa-solid fa-magnifying-glass" style="color: var(--text-muted);"></i>
-          <input type="text" id="marketSearch" placeholder="물품명 검색..." style="background: none; border: none; color: white; width: 100%; font-size: 0.88rem; outline: none;">
-        </div>
-        <div style="display: flex; gap: 8px;" id="marketCategoryFilters">
-          <button class="btn-filter active" data-category="all">전체</button>
-          <button class="btn-filter" data-category="digital">디지털/가전</button>
-          <button class="btn-filter" data-category="office">사무용품</button>
-          <button class="btn-filter" data-category="lifestyle">생활/기타</button>
-        </div>
-      </div>
-
-      <!-- Market Items Grid -->
-      <div class="welfare-portal-grid" id="marketItemsGrid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-        <!-- Dynamically rendered -->
-      </div>
-    </section>
-
     <!-- ========== MARKET REGISTER MODAL ========== -->
     <div class="modal-overlay" id="marketRegisterModal">
       <div class="modal-content glass">
@@ -1736,19 +1673,6 @@
         </form>
       </div>
     </div>
-
-    <!-- ===== TAB: REGISTRY ===== -->
-    <section class="tab-content" id="registry">
-      <div style="margin-bottom: 20px;">
-        <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">🎂 사내 경조사 알림판</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">임직원의 기쁜 소식과 경조사를 축하하고 마음을 전해보세요.</p>
-      </div>
-
-      <!-- Upcoming Event Feed List -->
-      <div style="display: flex; flex-direction: column; gap: 16px;" id="registryEventsList">
-        <!-- Dynamically rendered cards -->
-      </div>
-    </section>
 
     <!-- ========== CONGRATS CARD MODAL ========== -->
     <div class="modal-overlay" id="congratsCardModal">
