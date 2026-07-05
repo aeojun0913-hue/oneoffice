@@ -583,19 +583,115 @@ function _initAllFeatures() {
 
 // 대시보드 렌더
 function _renderDashboard() {
+  const user   = AppState.currentUser;
+  const events = AppState.events || [];
+  const emps   = AppState.employees || [];
+  const today  = new Date().toISOString().split('T')[0];
+  const thisMonth = today.substring(0, 7);
+
+  // ── 상단 4개 스탯 카드 (실데이터) ──────────────────────────────
+  // 1) 잔여 연차
+  const usedLeave = events.filter(e =>
+    e.employeeId === user?.id && e.type === 'leave' && e.start <= today
+  ).reduce((s, e) => s + (Number(e.leaveDays) || 0), 0);
+  const remainLeave = Math.max(0, 15 - usedLeave);
+  const elLeave = document.getElementById('statLeaveDays');
+  if (elLeave) elLeave.textContent = (remainLeave % 1 === 0 ? remainLeave : remainLeave.toFixed(1)) + '일';
+
+  // 2) 이번 달 경비 합산 (expense type 이벤트 기반)
+  const expenseEvents = events.filter(e => e.type === 'expense' && e.start?.startsWith(thisMonth));
+  const totalExpense  = expenseEvents.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const elSalary = document.getElementById('statNetSalary');
+  if (elSalary) {
+    if (totalExpense > 0) {
+      elSalary.textContent = totalExpense.toLocaleString() + '원';
+    } else {
+      // 급여 데이터 없으면 직급 기반 예시
+      const salaryMap = { '대표이사(CEO)': 8500000, 'CTO': 7000000, '인사담당자 (HR)': 4200000, '개발팀장 (대리)': 3800000, '개발 (사원)': 3200000, '디자인 (사원)': 3000000 };
+      const mySalary = salaryMap[user?.title] || 3500000;
+      elSalary.textContent = Math.round(mySalary * 0.88 / 10000) + '만원';
+    }
+  }
+
+  // 3) 오늘 출근 인원 (재택/연차 제외)
+  const todayAbsent = events.filter(e =>
+    (e.start <= today && (e.end || e.start) >= today) &&
+    (e.type === 'leave') &&
+    !['재택근무', '출장', '외근'].includes(e.leaveDays === 0 ? '재택근무' : '')
+  ).map(e => e.employeeId);
+  const presentCount = emps.length - new Set(todayAbsent).size;
+  const elMood = document.getElementById('statMoodAvg');
+  if (elMood) elMood.textContent = `${presentCount}/${emps.length}명`;
+
+  // 4) 미읽은 메신저 메시지 수
+  const chatLogs = AppState.chatLogs || {};
+  const unreadCount = Object.values(chatLogs).reduce((total, msgs) => {
+    if (!Array.isArray(msgs)) return total;
+    return total + msgs.filter(m => m.sender === 'received' && !m.read).length;
+  }, 0);
+  const elMsg = document.getElementById('statMessages');
+  if (elMsg) elMsg.textContent = unreadCount > 0 ? unreadCount + '건' : '없음';
+
+  // ── 활동 피드 (실제 이벤트 기반) ─────────────────────────────────
   const feedList = document.getElementById('dashboardFeedList');
   if (feedList) {
-    feedList.innerHTML = `
-      <div class="feed-item" style="border-left:3px solid var(--success);">
-        <div style="font-size:0.75rem;color:var(--text-muted);">방금 전 · 알림</div>
-        <div style="font-size:0.85rem;margin-top:2px;"><strong>OneOffice</strong> 사내 인트라넷이 정식 오픈되었습니다.</div>
-      </div>
-      <div class="feed-item" style="border-left:3px solid var(--secondary);">
-        <div style="font-size:0.75rem;color:var(--text-muted);">1시간 전 · 안내</div>
-        <div style="font-size:0.85rem;margin-top:2px;">사내 플리마켓 & 실시간 경조사 선물 발송 기능이 출시되었습니다! 🛍️</div>
-      </div>`;
+    // 최근 7일 이벤트를 활동 피드로 변환
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    const recentEvents = events
+      .filter(e => e.start >= sevenDaysAgo)
+      .sort((a, b) => b.start.localeCompare(a.start))
+      .slice(0, 6);
+
+    const typeIcons = { leave: '📅', expense: '💳', meeting: '🤝', default: '📌' };
+    const typeColors = { leave: 'var(--primary)', expense: 'var(--warning)', meeting: 'var(--success)', default: 'var(--secondary)' };
+
+    const feedHTML = recentEvents.length > 0
+      ? recentEvents.map(e => {
+          const icon  = typeIcons[e.type] || typeIcons.default;
+          const color = typeColors[e.type] || typeColors.default;
+          const isToday = e.start === today;
+          const dateLabel = isToday ? '오늘' : e.start;
+          return `<div class="feed-item" style="border-left:3px solid ${color};">
+            <div style="font-size:0.75rem;color:var(--text-muted);">${icon} ${dateLabel}</div>
+            <div style="font-size:0.85rem;margin-top:2px;">${e.title || '일정'}</div>
+          </div>`;
+        }).join('')
+      : `<div class="feed-item" style="border-left:3px solid var(--success);">
+          <div style="font-size:0.75rem;color:var(--text-muted);">시스템 알림</div>
+          <div style="font-size:0.85rem;margin-top:2px;"><strong>OneOffice</strong>에 오신 것을 환영합니다! 🎉</div>
+        </div>`;
+
+    feedList.innerHTML = feedHTML;
   }
-  window.renderRegistryEvents();
+
+  // ── 오늘 자리 비운 팀원 ────────────────────────────────────────
+  const awayList = document.getElementById('dashboardAwayList');
+  if (awayList) {
+    const awayToday = events.filter(e =>
+      e.type === 'leave' && e.start <= today && (e.end || e.start) >= today
+    );
+    if (awayToday.length === 0) {
+      awayList.innerHTML = `<div style="color:var(--text-muted);font-size:0.82rem;padding:8px 0;">오늘 자리 비운 팀원이 없습니다 ✅</div>`;
+    } else {
+      awayList.innerHTML = awayToday.map(e => {
+        const emp = emps.find(em => em.id === e.employeeId);
+        const name = emp?.name || e.title?.split(' [')[0] || '팀원';
+        const type = e.title?.match(/\[([^\]]+)\]/)?.[1] || '부재';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-color);">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:white;">${name[0]}</div>
+          <div><div style="font-size:0.82rem;font-weight:600;">${name}</div><div style="font-size:0.72rem;color:var(--text-muted);">${type}</div></div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── 날짜 업데이트 ─────────────────────────────────────────────
+  const todayDate = document.getElementById('todayOOODate');
+  if (todayDate) {
+    const d = new Date();
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    todayDate.textContent = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} (${days[d.getDay()]})`;
+  }
 }
 
 // 조직도 초기화
