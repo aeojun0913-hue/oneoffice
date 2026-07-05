@@ -657,6 +657,28 @@
         </div>
       </div>
 
+      <!-- ===== 실시간 근무 현황 위젯 (NEW) ===== -->
+      <div class="feed-card glass" style="margin-bottom:20px;padding:20px;">
+        <div class="feed-header" style="margin-bottom:16px;">
+          <span class="card-title"><i class="fa-solid fa-circle-dot" style="color:var(--success);"></i> 실시간 팀 근무 현황</span>
+          <span id="attendanceLiveTime" style="font-size:0.78rem;color:var(--text-muted);"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;" id="teamAttendanceGrid">
+          <!-- JS로 렌더링 -->
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color);flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block;"></span>재실 근무</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:var(--warning);display:inline-block;"></span>재택/외근</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:var(--danger);display:inline-block;"></span>휴가/부재</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;"><span style="width:10px;height:10px;border-radius:50%;background:var(--text-dark);display:inline-block;"></span>퇴근</div>
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <span style="font-size:0.8rem;color:var(--text-muted);">재실: <strong id="attendCountIn" style="color:var(--success);">0</strong></span>
+            <span style="font-size:0.8rem;color:var(--text-muted);">부재: <strong id="attendCountOut" style="color:var(--danger);">0</strong></span>
+            <span style="font-size:0.8rem;color:var(--text-muted);">전체: <strong id="attendCountTotal" style="color:var(--text-main);">0</strong></span>
+          </div>
+        </div>
+      </div>
+
       <!-- NEW: CLUB SECTION (사내 동호회/동아리 관리 칸) -->
       <div class="feed-card glass" style="margin-bottom: 24px; padding: 22px;">
         <div class="feed-header">
@@ -864,22 +886,16 @@
     <!-- ===== TAB: DIRECTORY ===== -->
     <section class="tab-content" id="directory">
       <div class="directory-layout">
-        <div class="org-chart-container glass">
-          <div class="org-tree">
-            <h3 class="card-title" style="align-self:flex-start;"><i class="fa-solid fa-network-wired" style="color:var(--secondary);"></i> 조직도</h3>
-            <div class="org-level">
-              <div class="org-node glass glass-interactive" data-emp-id="1"><div class="node-dept">Executive</div><div class="node-name">Jane Doe</div><div class="node-title">대표이사 (CEO)</div></div>
-            </div>
-            <div class="org-level">
-              <div class="org-node glass glass-interactive" data-emp-id="2"><div class="node-dept">Technology</div><div class="node-name">John Smith</div><div class="node-title">기술이사 (CTO)</div></div>
-              <div class="org-node glass glass-interactive" data-emp-id="3"><div class="node-dept">Human Resources</div><div class="node-name">Anna Lee</div><div class="node-title">인사팀장 (HR)</div></div>
-            </div>
-            <div class="org-level">
-              <div class="org-node glass glass-interactive" data-emp-id="4"><div class="node-dept">Technology</div><div class="node-name">홍길동</div><div class="node-title">개발팀 (대리)</div></div>
-              <div class="org-node glass glass-interactive" data-emp-id="5"><div class="node-dept">Technology</div><div class="node-name">김태희</div><div class="node-title">개발팀 (사원)</div></div>
-              <div class="org-node glass glass-interactive" data-emp-id="6"><div class="node-dept">Design</div><div class="node-name">이민정</div><div class="node-title">디자인팀 (선임)</div></div>
+        <div class="org-chart-container glass" style="overflow:hidden;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 class="card-title"><i class="fa-solid fa-network-wired" style="color:var(--secondary);"></i> 인터랙티브 조직도</h3>
+            <div style="display:flex;gap:8px;">
+              <button id="orgZoomIn"  style="background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:var(--text-muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;">＋</button>
+              <button id="orgZoomOut" style="background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:var(--text-muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;">－</button>
+              <button id="orgReset"   style="background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:var(--text-muted);padding:0 10px;height:32px;border-radius:8px;cursor:pointer;font-size:0.75rem;">초기화</button>
             </div>
           </div>
+          <div id="svgOrgChart" style="width:100%;height:380px;overflow:hidden;cursor:grab;position:relative;"></div>
         </div>
         <div>
           <div class="filter-bar">
@@ -1897,12 +1913,19 @@
         <button class="modal-close" id="floatingChatClose">&times;</button>
       </div>
       <div class="floating-chat-body" id="floatingChatBody">
-        <div class="chat-bubble bubble-received" style="font-size:0.85rem; max-width:90%;">
-          "연차 쓸래", "이민정 성향 알려줘", "주휴수당 계산해줘" 등을 입력해보세요!
+        <div class="chat-bubble bubble-received" style="font-size:0.85rem; max-width:100%;">
+          <div style="font-weight:700;color:var(--secondary);margin-bottom:6px;">👋 OneOffice AI Copilot</div>
+          <div style="line-height:1.6;">캘린더·보고서·조직도 연동 AI 비서입니다.<br>아래 예시를 클릭해 보세요!</div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-top:10px;">
+            <button class="ai-quick-cmd" data-cmd="오늘 연차 신청해줘" style="background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:var(--primary);border-radius:8px;padding:5px 8px;font-size:0.75rem;cursor:pointer;text-align:left;">✈️ 오늘 연차 신청해줘</button>
+            <button class="ai-quick-cmd" data-cmd="주간 업무 보고서 초안 써줘" style="background:rgba(6,182,212,0.12);border:1px solid rgba(6,182,212,0.25);color:var(--secondary);border-radius:8px;padding:5px 8px;font-size:0.75rem;cursor:pointer;text-align:left;">📝 주간 업무 보고서 초안 써줘</button>
+            <button class="ai-quick-cmd" data-cmd="홍길동 정보 알려줘" style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);color:var(--accent);border-radius:8px;padding:5px 8px;font-size:0.75rem;cursor:pointer;text-align:left;">🔍 홍길동 정보 알려줘</button>
+            <button class="ai-quick-cmd" data-cmd="주휴수당 계산해줘" style="background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);color:var(--success);border-radius:8px;padding:5px 8px;font-size:0.75rem;cursor:pointer;text-align:left;">💰 주휴수당 계산해줘</button>
+          </div>
         </div>
       </div>
       <div class="floating-chat-input">
-        <input type="text" id="floatingChatInput" class="form-control" placeholder="명령어 또는 질문 입력..." style="font-size:0.85rem; flex-grow:1;">
+        <input type="text" id="floatingChatInput" class="form-control" placeholder="연차, 보고서, 조직도 등 자유롭게..." style="font-size:0.85rem; flex-grow:1;">
         <button id="floatingChatSend" class="btn-primary" style="padding:10px 14px;"><i class="fa-solid fa-paper-plane"></i></button>
       </div>
     </div>

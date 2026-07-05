@@ -567,6 +567,11 @@ function _initAllFeatures() {
   _renderMyEventsList();
   _initWelfareMapInterceptor();
 
+  // ✨ 신규 기능 초기화
+  _initTeamAttendance();
+  _initSVGOrgChart();
+  _initAICopilot();
+
   // 초기 렌더
   _updateUIForCurrentUser();
   window.renderRegistryEvents();
@@ -1808,3 +1813,369 @@ function _injectReportTemplateButtons() {
   if (titleInput) titleInput.parentElement.before(tplDiv);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 👥 실시간 팀 근무 현황 위젯
+// ═══════════════════════════════════════════════════════════════════════
+function _initTeamAttendance() {
+  const STATUS_COLORS = {
+    '재실 근무': 'var(--success)',
+    '재택근무':  'var(--warning)',
+    '외근':      'var(--warning)',
+    '출장':      'var(--warning)',
+    '휴가/부재': 'var(--danger)',
+    '퇴근':      'rgba(150,150,150,0.5)',
+  };
+
+  function _getEmpStatus(emp) {
+    const today = new Date().toISOString().split('T')[0];
+    const evt   = AppState.events.find(e =>
+      e.employeeId === emp.id &&
+      e.start <= today && (e.end || e.start) >= today
+    );
+    if (!evt) return '재실 근무';
+    const t = evt.title || '';
+    if (t.includes('재택')) return '재택근무';
+    if (t.includes('외근')) return '외근';
+    if (t.includes('출장')) return '출장';
+    if (t.includes('연차') || t.includes('반차') || t.includes('병가') || t.includes('경조')) return '휴가/부재';
+    return '재실 근무';
+  }
+
+  function _renderAttendance() {
+    const grid  = document.getElementById('teamAttendanceGrid');
+    const ltime = document.getElementById('attendanceLiveTime');
+    if (!grid) return;
+    const now = new Date();
+    if (ltime) ltime.textContent = `🕐 ${now.toTimeString().split(' ')[0]} 기준 (30초마다 갱신)`;
+    const emps = AppState.employees || [];
+    let inCount = 0, outCount = 0;
+    const gradients = [
+      'linear-gradient(135deg,var(--primary),var(--secondary))',
+      'linear-gradient(135deg,var(--secondary),var(--accent))',
+      'linear-gradient(135deg,var(--accent),var(--primary))',
+      'linear-gradient(135deg,var(--success),var(--secondary))',
+    ];
+    grid.innerHTML = emps.map(emp => {
+      const status = _getEmpStatus(emp);
+      const color  = STATUS_COLORS[status] || STATUS_COLORS['재실 근무'];
+      if (status === '재실 근무') inCount++; else outCount++;
+      return `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;
+          background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:12px;
+          cursor:pointer;transition:all 0.2s;"
+          onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+          onmouseout="this.style.background='rgba(255,255,255,0.02)'"
+          onclick="window.showMemberDetail(${emp.id})" title="${emp.name} · ${emp.dept}">
+          <div style="position:relative;">
+            <div style="width:40px;height:40px;border-radius:50%;background:${gradients[emp.id % gradients.length]};
+              display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:1rem;">
+              ${emp.initial || emp.name[0]}
+            </div>
+            <span style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;
+              background:${color};border:2px solid var(--surface-dark);"></span>
+          </div>
+          <div style="font-size:0.72rem;font-weight:700;color:var(--text-main);text-align:center;
+            max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${emp.name}</div>
+          <div style="font-size:0.65rem;color:${color};font-weight:600;text-align:center;">${status}</div>
+        </div>`;
+    }).join('');
+    const tot = document.getElementById('attendCountTotal');
+    const inn = document.getElementById('attendCountIn');
+    const out = document.getElementById('attendCountOut');
+    if (tot) tot.textContent = emps.length;
+    if (inn) inn.textContent = inCount;
+    if (out) out.textContent = outCount;
+  }
+
+  _renderAttendance();
+  setInterval(_renderAttendance, 30000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🌳 인터랙티브 SVG 조직도 (드래그/줌/클릭)
+// ═══════════════════════════════════════════════════════════════════════
+function _initSVGOrgChart() {
+  const container = document.getElementById('svgOrgChart');
+  if (!container || container._orgDone) return;
+  container._orgDone = true;
+
+  const emps = AppState.employees || [];
+  if (emps.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">직원 데이터가 없습니다.</div>';
+    return;
+  }
+
+  // 부서별 그룹화
+  const deptMap = {};
+  emps.forEach(e => { if (!deptMap[e.dept]) deptMap[e.dept] = []; deptMap[e.dept].push(e); });
+  const depts = Object.keys(deptMap);
+  const W = container.clientWidth || 720;
+  const H = 380;
+  const NODE_W = 115, NODE_H = 56;
+  const DEPT_COLORS = ['#6366f1','#06b6d4','#a855f7','#10b981','#f59e0b','#ef4444','#ec4899'];
+
+  let scale = 1, panX = 0, panY = 10, dragging = false, startX, startY, lastPanX, lastPanY;
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('width','100%'); svg.setAttribute('height',H);
+  svg.style.cssText = 'display:block;user-select:none;';
+  container.appendChild(svg);
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  svg.appendChild(g);
+
+  function applyTransform() {
+    g.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`);
+  }
+
+  // 위치 계산
+  const deptXStep = W / (depts.length + 1);
+  const positions = {};
+  depts.forEach((dept, di) => {
+    const dx = deptXStep * (di + 1);
+    positions['d' + di] = { x: dx, y: 30, dept, color: DEPT_COLORS[di % DEPT_COLORS.length] };
+    deptMap[dept].forEach((emp, ei) => {
+      const ex = dx + (ei - (deptMap[dept].length - 1) / 2) * (NODE_W + 12);
+      positions['e' + emp.id] = { x: ex, y: 160, emp, color: DEPT_COLORS[di % DEPT_COLORS.length] };
+    });
+  });
+
+  // 연결선
+  depts.forEach((dept, di) => {
+    const dp = positions['d' + di];
+    deptMap[dept].forEach(emp => {
+      const ep = positions['e' + emp.id];
+      const line = document.createElementNS('http://www.w3.org/2000/svg','path');
+      line.setAttribute('d', `M${dp.x},${dp.y + 28} C${dp.x},${(dp.y + ep.y)/2} ${ep.x},${(dp.y + ep.y)/2} ${ep.x},${ep.y}`);
+      line.setAttribute('stroke', dp.color);
+      line.setAttribute('stroke-width','1.5');
+      line.setAttribute('fill','none');
+      line.setAttribute('opacity','0.35');
+      g.appendChild(line);
+    });
+  });
+
+  // 부서 노드
+  depts.forEach((dept, di) => {
+    const { x, y, color } = positions['d' + di];
+    const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bg.setAttribute('x', x - NODE_W/2); bg.setAttribute('y', y);
+    bg.setAttribute('width', NODE_W); bg.setAttribute('height', 28);
+    bg.setAttribute('rx', 9); bg.setAttribute('fill', color); bg.setAttribute('opacity','0.2');
+    g.appendChild(bg);
+    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x', x); txt.setAttribute('y', y + 19);
+    txt.setAttribute('text-anchor','middle'); txt.setAttribute('fill', color);
+    txt.setAttribute('font-size','11'); txt.setAttribute('font-weight','700');
+    txt.textContent = dept;
+    g.appendChild(txt);
+  });
+
+  // 직원 노드
+  Object.values(positions).filter(p => p.emp).forEach(p => {
+    const { x, y, emp, color } = p;
+    // 배경 카드
+    const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    bg.setAttribute('x', x - NODE_W/2); bg.setAttribute('y', y);
+    bg.setAttribute('width', NODE_W); bg.setAttribute('height', NODE_H);
+    bg.setAttribute('rx', 10); bg.setAttribute('fill','rgba(255,255,255,0.04)');
+    bg.setAttribute('stroke', color); bg.setAttribute('stroke-width','1.5');
+    g.appendChild(bg);
+    // 아바타
+    const avi = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    avi.setAttribute('cx', x - NODE_W/2 + 20); avi.setAttribute('cy', y + NODE_H/2);
+    avi.setAttribute('r','14'); avi.setAttribute('fill', color);
+    g.appendChild(avi);
+    const it = document.createElementNS('http://www.w3.org/2000/svg','text');
+    it.setAttribute('x', x - NODE_W/2 + 20); it.setAttribute('y', y + NODE_H/2 + 5);
+    it.setAttribute('text-anchor','middle'); it.setAttribute('fill','white');
+    it.setAttribute('font-size','11'); it.setAttribute('font-weight','700');
+    it.textContent = emp.initial || emp.name[0];
+    g.appendChild(it);
+    // 이름
+    const nt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    nt.setAttribute('x', x - NODE_W/2 + 38); nt.setAttribute('y', y + 20);
+    nt.setAttribute('fill','#f1f5f9'); nt.setAttribute('font-size','11'); nt.setAttribute('font-weight','700');
+    nt.textContent = emp.name;
+    g.appendChild(nt);
+    // 직급
+    const tt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    tt.setAttribute('x', x - NODE_W/2 + 38); tt.setAttribute('y', y + 34);
+    tt.setAttribute('fill','rgba(200,210,230,0.6)'); tt.setAttribute('font-size','9.5');
+    tt.textContent = emp.title;
+    g.appendChild(tt);
+    // MBTI 배지
+    if (emp.mbti) {
+      const mb = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      mb.setAttribute('x', x - NODE_W/2 + 38); mb.setAttribute('y', y + 39);
+      mb.setAttribute('width','32'); mb.setAttribute('height','13');
+      mb.setAttribute('rx','4'); mb.setAttribute('fill', color); mb.setAttribute('opacity','0.3');
+      g.appendChild(mb);
+      const mt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      mt.setAttribute('x', x - NODE_W/2 + 54); mt.setAttribute('y', y + 50);
+      mt.setAttribute('text-anchor','middle'); mt.setAttribute('fill', color);
+      mt.setAttribute('font-size','8'); mt.setAttribute('font-weight','700');
+      mt.textContent = emp.mbti;
+      g.appendChild(mt);
+    }
+    // 투명 클릭 레이어
+    const cl = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    cl.setAttribute('x', x - NODE_W/2); cl.setAttribute('y', y);
+    cl.setAttribute('width', NODE_W); cl.setAttribute('height', NODE_H);
+    cl.setAttribute('rx', 10); cl.setAttribute('fill','transparent');
+    cl.style.cursor = 'pointer';
+    cl.addEventListener('click', ev => {
+      ev.stopPropagation();
+      if (Math.abs(panX - lastPanX) < 4 && Math.abs(panY - lastPanY) < 4) {
+        window.showMemberDetail(emp.id);
+      }
+    });
+    g.appendChild(cl);
+  });
+
+  // 드래그 팬
+  svg.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startY = e.clientY;
+    lastPanX = panX; lastPanY = panY;
+    svg.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    panX = lastPanX + (e.clientX - startX);
+    panY = lastPanY + (e.clientY - startY);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => { dragging = false; svg.style.cursor = 'grab'; });
+
+  // 줌 버튼
+  document.getElementById('orgZoomIn') ?.addEventListener('click', () => { scale = Math.min(scale + 0.15, 2.5); applyTransform(); });
+  document.getElementById('orgZoomOut')?.addEventListener('click', () => { scale = Math.max(scale - 0.15, 0.4); applyTransform(); });
+  document.getElementById('orgReset')  ?.addEventListener('click', () => { scale = 1; panX = 0; panY = 10; applyTransform(); });
+
+  // 마우스휠 줌
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    scale = Math.max(0.4, Math.min(2.5, scale + (e.deltaY < 0 ? 0.1 : -0.1)));
+    applyTransform();
+  }, { passive: false });
+
+  applyTransform();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🤖 AI Copilot — 플로팅 채팅 컨텍스트 인식 명령 처리
+// ═══════════════════════════════════════════════════════════════════════
+function _initAICopilot() {
+  const input   = document.getElementById('floatingChatInput');
+  const sendBtn = document.getElementById('floatingChatSend');
+  const body    = document.getElementById('floatingChatBody');
+  if (!input || !sendBtn || !body) return;
+
+  // 빠른 명령 버튼 클릭
+  body.addEventListener('click', e => {
+    const btn = e.target.closest('.ai-quick-cmd');
+    if (!btn) return;
+    input.value = btn.getAttribute('data-cmd') || '';
+    sendBtn.click();
+  });
+
+  function _goTab(tabId) {
+    document.querySelector(`.nav-item[data-tab="${tabId}"]`)?.click();
+  }
+
+  function _addBubble(text, side = 'received', asHtml = false) {
+    const div = document.createElement('div');
+    div.className = `chat-bubble bubble-${side}`;
+    div.style.cssText = 'margin:6px 0;font-size:0.82rem;line-height:1.6;';
+    if (side === 'sent') {
+      div.textContent = text;
+    } else {
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:0.72rem;color:var(--secondary);display:block;margin-bottom:4px;font-weight:700;';
+      lbl.textContent = '🤖 AI Copilot';
+      div.appendChild(lbl);
+      const content = document.createElement('div');
+      content.style.whiteSpace = 'pre-wrap';
+      if (asHtml) content.innerHTML = text; else content.textContent = text;
+      div.appendChild(content);
+    }
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+    return div;
+  }
+
+  async function _processCommand(txt) {
+    const t = txt.trim();
+    if (!t) return;
+    _addBubble(t, 'sent');
+    input.value = '';
+    sendBtn.disabled = true;
+
+    const loadDiv    = _addBubble('⏳ 처리 중...', 'received');
+    const updateLoad = (msg) => { if (loadDiv.lastChild) loadDiv.lastChild.textContent = msg; };
+
+    const lower = t.toLowerCase();
+    const user  = AppState.currentUser;
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      // ── 연차/휴가 신청 ───────────────────────────────────────────
+      const leaveMatch = lower.match(/(연차|오전반차|오후반차|재택근무|출장|외근|반차|병가)/);
+      if (leaveMatch && (lower.includes('신청') || lower.includes('써줘') || lower.includes('등록') || lower.includes('쓸래'))) {
+        const type = leaveMatch[1];
+        let start  = today;
+        const dateRx = t.match(/(\d{4}-\d{2}-\d{2})/);
+        if (lower.includes('내일'))      { const d = new Date(); d.setDate(d.getDate()+1); start = d.toISOString().split('T')[0]; }
+        else if (lower.includes('모레')) { const d = new Date(); d.setDate(d.getDate()+2); start = d.toISOString().split('T')[0]; }
+        else if (dateRx)                 { start = dateRx[1]; }
+        _goTab('calendar');
+        await CalendarModule.applyLeave(start, start, type, 'AI Copilot 자동 신청');
+        updateLoad(`✅ [${type}] ${start} 캘린더에 즉시 등록됐습니다! 캘린더 탭에서 확인하세요.`);
+        return;
+      }
+
+      // ── 업무 보고서 초안 ──────────────────────────────────────────
+      if (lower.includes('보고서') || lower.includes('업무보고') || lower.includes('보고')) {
+        _goTab('reports');
+        const type = lower.includes('주간') ? 'weekly' : lower.includes('프로젝트') ? 'project' : 'daily';
+        window.applyReportTemplate(type);
+        setTimeout(() => window.generateAIReportDraft?.(), 600);
+        updateLoad(`📝 업무보고 탭에서 ${type === 'weekly' ? '주간' : type === 'project' ? '프로젝트' : '일일'} 보고서 AI 초안을 작성 중입니다...`);
+        return;
+      }
+
+      // ── 직원 정보 조회 ──────────────────────────────────────────
+      const empHit = AppState.employees.find(e => t.includes(e.name));
+      if (empHit && (lower.includes('알려') || lower.includes('정보') || lower.includes('성향') || lower.includes('mbti'))) {
+        updateLoad(
+          `👤 ${empHit.name} (${empHit.dept} · ${empHit.title})\n` +
+          `📧 ${empHit.email}\n📱 ${empHit.phone}\n` +
+          `🧠 MBTI: ${empHit.mbti || 'N/A'} · ${empHit.workStyle || 'N/A'}\n` +
+          `📅 입사일: ${empHit.joinDate}`
+        );
+        return;
+      }
+
+      // ── 조직도 이동 ──────────────────────────────────────────────
+      if (lower.includes('조직도') || lower.includes('직원 목록') || lower.includes('팀 구성')) {
+        _goTab('directory');
+        updateLoad('🌳 조직도 탭으로 이동했습니다. SVG 조직도에서 직원 카드를 클릭하면 프로필을 볼 수 있어요!');
+        return;
+      }
+
+      // ── Gemini AI 일반 답변 ──────────────────────────────────────
+      const prompt = `당신은 OneOffice 사내 AI 비서입니다. 현재 로그인 사용자: ${
+        user ? `${user.name} (${user.dept} · ${user.title})` : '알 수 없음'}.\n질문: ${t}`;
+      const aiText = await MockAPI.generateWithAI(prompt);
+      updateLoad(aiText || '답변을 가져오지 못했습니다.');
+
+    } catch (err) {
+      updateLoad('처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.addEventListener('click', () => _processCommand(input.value));
+  input.addEventListener('keypress', e => { if (e.key === 'Enter') _processCommand(input.value); });
+}
