@@ -326,7 +326,6 @@ window.updateMarketItemStatus = async function(itemId, newStatus) {
     CloudDB.set('fleaMarketItems', AppState.fleaMarketItems);
   }
   window.showToast('🛍️ 상품 상태 변경', `상품 상태가 '${newStatus}'(으)로 변경되었습니다.`, 'success');
-  window.renderMarketItems();
 };
 
 /** 마켓 구매 문의 → 메신저 DM으로 이동 */
@@ -447,7 +446,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       _initAllFeatures();
 
       // 로그인 후 초기 렌더
-      window.renderRegistryEvents();
       window.renderChatMessages();
       window.renderSecurityAuditLogs();
     });
@@ -578,8 +576,6 @@ function _initAllFeatures() {
 
   // 초기 렌더
   _updateUIForCurrentUser();
-  window.renderRegistryEvents();
-  window.renderMarketItems();
 }
 
 // 대시보드 렌더
@@ -887,7 +883,6 @@ function _initMarket() {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#marketCategoryFilters button').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      window.renderMarketItems();
     });
   });
   const search = document.getElementById('marketSearch');
@@ -922,7 +917,6 @@ function _initMarket() {
       window.showToast('🛍️ 마켓 물품 등록', `'${title}'이 마켓에 등록되었습니다.`, 'success');
       modal?.classList.remove('active');
       form.reset();
-      window.renderMarketItems();
     });
   }
 }
@@ -1740,7 +1734,6 @@ window.toggleWishlist = function(itemId) {
     window.showToast('🤍 찜 해제', '관심 목록에서 제거되었습니다.', 'info');
   }
   localStorage.setItem('oo_wishlist', JSON.stringify(wishes));
-  window.renderMarketItems();
 };
 
 // 플리마켓 렌더 함수 패치 — 찜 기능 추가
