@@ -1302,28 +1302,44 @@ function _initCalendarEditFeatures() {
   });
 }
 
-/** 내 일정 목록 렌더링 */
+/** 내 일정 목록 렌더링 (전역 노출 — calendarModule.js에서도 호출 가능) */
 function _renderMyEventsList() {
   const list = document.getElementById('myEventsList');
   if (!list) return;
   const userId = AppState.currentUser?.id;
-  const myEvts = AppState.events.filter(e => e.employeeId === userId).slice(-5).reverse();
+  const myEvts = AppState.events
+    .filter(e => e.employeeId === userId)
+    .sort((a, b) => (b.start || '').localeCompare(a.start || ''))
+    .slice(0, 8);
+
   if (myEvts.length === 0) {
-    list.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:10px;">등록된 일정이 없습니다.</div>`;
+    list.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);text-align:center;padding:16px;">등록된 일정이 없습니다.</div>`;
     return;
   }
+
   list.innerHTML = myEvts.map(evt => {
     const typeLabel = evt.title?.match(/\[(.+)\]/)?.[1] || '일정';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:8px;font-size:0.8rem;cursor:pointer;"
+    const dateRange = evt.end && evt.end !== evt.start
+      ? `${evt.start} ~ ${evt.end}`
+      : evt.start;
+    const isPending = evt.id?.startsWith('tmp_');
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:8px;font-size:0.8rem;cursor:pointer;transition:background 0.2s;"
+         onmouseover="this.style.background='rgba(255,255,255,0.04)'"
+         onmouseout="this.style.background='rgba(255,255,255,0.02)'"
          onclick="window.openEventEdit('${evt.id}')">
-      <div>
-        <span style="background:${evt.color||'var(--primary)'};color:white;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:700;">${typeLabel}</span>
-        <span style="margin-left:6px;color:var(--text-muted);">${evt.start}${evt.end && evt.end !== evt.start ? ' ~ ' + evt.end : ''}</span>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="background:${evt.color||'var(--primary)'};color:white;padding:2px 7px;border-radius:4px;font-size:0.7rem;font-weight:700;">${typeLabel}</span>
+          ${isPending ? '<span style="font-size:0.65rem;color:var(--warning);">저장 중...</span>' : ''}
+        </div>
+        <span style="color:var(--text-muted);font-size:0.75rem;">${dateRange}</span>
       </div>
-      <i class="fa-solid fa-pen" style="color:var(--text-muted);font-size:0.75rem;"></i>
+      <i class="fa-solid fa-pen-to-square" style="color:var(--text-muted);font-size:0.75rem;flex-shrink:0;"></i>
     </div>`;
   }).join('');
 }
+// 전역 노출: calendarModule.js 등 외부 모듈에서도 직접 호출 가능
+window._renderMyEventsList = _renderMyEventsList;
 
 /** 이벤트 수정 모달 열기 */
 window.openEventEdit = function(eventId) {
