@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ╔══════════════════════════════════════════════════════════════════════╗
  * ║  OneOffice — Phase 2 Enterprise Security Backend                    ║
  * ║  server.js v2.0 | 대기업 인트라넷급 SaaS 백엔드                        ║
@@ -115,7 +115,29 @@ function _getDefaultDB() {
     // 컬렉션 (모두 테넌트 격리됨)
     [`oneoffice_${TENANT_ID}_v1_employees`]: _getDefaultEmployees(),
     [`oneoffice_${TENANT_ID}_v1_welfarePoints`]: { '1':150000,'2':120000,'3':95000,'4':52000,'5':30000,'6':45000 },
-    [`oneoffice_${TENANT_ID}_v1_calendarEvents`]: [],
+    [`oneoffice_${TENANT_ID}_v1_calendarEvents`]: (() => {
+      const y = new Date().getFullYear();
+      const m = String(new Date().getMonth() + 1).padStart(2, '0');
+      return [
+        // Jane Doe (id:1) — 대표이사
+        { id:'ev_j1', title:'Jane Doe [연차]',   start:`${y}-${m}-08`, end:`${y}-${m}-09`, type:'leave', color:'#6366f1', employeeId:1, leaveDays:2 },
+        { id:'ev_j2', title:'Jane Doe [출장]',   start:`${y}-${m}-20`, end:`${y}-${m}-21`, type:'leave', color:'#f97316', employeeId:1, leaveDays:0 },
+        // John Smith (id:2) — CTO
+        { id:'ev_s1', title:'John Smith [병가]',  start:`${y}-${m}-03`, end:`${y}-${m}-03`, type:'leave', color:'#ef4444', employeeId:2, leaveDays:1 },
+        { id:'ev_s2', title:'John Smith [재택근무]',start:`${y}-${m}-14`, end:`${y}-${m}-14`, type:'leave', color:'#3b82f6', employeeId:2, leaveDays:0 },
+        // Anna Lee (id:3) — HR
+        { id:'ev_a1', title:'Anna Lee [오전반차]', start:`${y}-${m}-10`, end:`${y}-${m}-10`, type:'leave', color:'#06b6d4', employeeId:3, leaveDays:0.5 },
+        { id:'ev_a2', title:'Anna Lee [경조사휴가]',start:`${y}-${m}-25`, end:`${y}-${m}-26`, type:'leave', color:'#f59e0b', employeeId:3, leaveDays:2 },
+        // 홍길동 (id:4) — 개발팀장
+        { id:'ev_h1', title:'홍길동 [연차]',      start:`${y}-${m}-06`, end:`${y}-${m}-07`, type:'leave', color:'#a855f7', employeeId:4, leaveDays:2 },
+        { id:'ev_h2', title:'홍길동 [반차]',      start:`${y}-${m}-15`, end:`${y}-${m}-15`, type:'leave', color:'#06b6d4', employeeId:4, leaveDays:0.5 },
+        // 김태희 (id:5)
+        { id:'ev_k1', title:'김태희 [재택근무]',   start:`${y}-${m}-12`, end:`${y}-${m}-12`, type:'leave', color:'#3b82f6', employeeId:5, leaveDays:0 },
+        // 이민정 (id:6)
+        { id:'ev_i1', title:'이민정 [연차]',      start:`${y}-${m}-18`, end:`${y}-${m}-18`, type:'leave', color:'#10b981', employeeId:6, leaveDays:1 },
+      ];
+    })(),
+
     [`oneoffice_${TENANT_ID}_v1_chatLogs`]: {
       group: [
         { sender:'received', senderName:'Jane Doe', text:'원오피스 사내 단체 대화방입니다. 오늘 하루도 파이팅!', timestamp: new Date().toISOString() }

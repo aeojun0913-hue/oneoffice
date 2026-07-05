@@ -1944,177 +1944,193 @@ function _initSVGOrgChart() {
     return;
   }
 
-  // 부서별 그룹화
-  const deptMap = {};
-  emps.forEach(e => { if (!deptMap[e.dept]) deptMap[e.dept] = []; deptMap[e.dept].push(e); });
-  const depts = Object.keys(deptMap);
-  // Tab-switch fix: clientWidth=0 when hidden, use ResizeObserver
-  const W = container.clientWidth || 720;
+  // Tab-switch fix: clientWidth=0 when tab hidden → ResizeObserver
+  const W = container.clientWidth || 820;
   if (W < 50 && typeof ResizeObserver !== 'undefined') {
     container._orgDone = false;
     const _ro = new ResizeObserver(entries => {
       for (const e of entries) {
-        if (e.contentRect.width > 50) {
-          _ro.disconnect();
-          container._orgDone = false;
-          _initSVGOrgChart();
-          break;
-        }
+        if (e.contentRect.width > 50) { _ro.disconnect(); container._orgDone = false; _initSVGOrgChart(); break; }
       }
     });
     _ro.observe(container);
     return;
   }
-  const H = 380;
-  const NODE_W = 115, NODE_H = 56;
+
+  // ── 상수 ────────────────────────────────────────────────────────
+  const NODE_W = 130, NODE_H = 60, GAP_X = 16, DEPT_H = 30;
+  const ROW_Y = 20, EMP_Y = 110;
   const DEPT_COLORS = ['#6366f1','#06b6d4','#a855f7','#10b981','#f59e0b','#ef4444','#ec4899'];
 
-  let scale = 1, panX = 0, panY = 10, dragging = false, startX, startY, lastPanX, lastPanY;
+  // 부서별 그룹화
+  const deptMap = {};
+  emps.forEach(e => { if (!deptMap[e.dept]) deptMap[e.dept] = []; deptMap[e.dept].push(e); });
+  const depts = Object.keys(deptMap);
 
-  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-  svg.setAttribute('width','100%'); svg.setAttribute('height',H);
-  svg.style.cssText = 'display:block;user-select:none;';
+  // ── 가로 위치 계산 (겹침 방지) ──────────────────────────────────
+  // 각 부서 블록 너비 = max(NODE_W, 직원수 * (NODE_W + GAP_X) - GAP_X)
+  const DEPT_GAP = 28;
+  const deptWidths = depts.map(dept => Math.max(NODE_W, deptMap[dept].length * (NODE_W + GAP_X) - GAP_X));
+  const totalW = deptWidths.reduce((s, w) => s + w, 0) + DEPT_GAP * (depts.length - 1);
+
+  // 전체 내용이 컨테이너보다 넓으면 스케일 조정
+  const initScale = Math.min(1, (W - 32) / Math.max(totalW, 1));
+  const CANVAS_H = 280;
+  const H = Math.max(280, CANVAS_H);
+
+  let scale = initScale, panX = 16, panY = 10;
+  let dragging = false, startX, startY, lastPX, lastPY;
+
+  // 컨테이너 초기화
+  container.innerHTML = '';
+  container.style.cssText += ';overflow:hidden;position:relative;';
+
+  // 컨트롤 버튼
+  const ctrl = document.createElement('div');
+  ctrl.style.cssText = 'position:absolute;top:8px;right:8px;z-index:10;display:flex;gap:4px;';
+  const btnStyle = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#f1f5f9;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;';
+  [['＋', () => { scale = Math.min(3, scale + 0.15); applyT(); }],
+   ['－', () => { scale = Math.max(0.3, scale - 0.15); applyT(); }],
+   ['초기화', () => { scale = initScale; panX = 16; panY = 10; applyT(); }]
+  ].forEach(([label, fn]) => {
+    const b = document.createElement('button'); b.textContent = label; b.style.cssText = btnStyle;
+    b.addEventListener('click', fn); ctrl.appendChild(b);
+  });
+  container.appendChild(ctrl);
+
+  // SVG
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '100%'); svg.setAttribute('height', H);
+  svg.style.cssText = 'display:block;user-select:none;cursor:grab;';
   container.appendChild(svg);
 
-  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   svg.appendChild(g);
 
-  function applyTransform() {
-    g.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`);
-  }
+  function applyT() { g.setAttribute('transform', `translate(${panX},${panY}) scale(${scale})`); }
 
-  // 위치 계산
-  const deptXStep = W / (depts.length + 1);
-  const positions = {};
+  // ── 위치 계산 ──────────────────────────────────────────────────
+  const pos = {}; // { dX, empX, y }
+  let curX = 0;
   depts.forEach((dept, di) => {
-    const dx = deptXStep * (di + 1);
-    positions['d' + di] = { x: dx, y: 30, dept, color: DEPT_COLORS[di % DEPT_COLORS.length] };
+    const dw = deptWidths[di];
+    const color = DEPT_COLORS[di % DEPT_COLORS.length];
+    const numEmps = deptMap[dept].length;
+    const empTotalW = numEmps * (NODE_W + GAP_X) - GAP_X;
+    const deptCenterX = curX + dw / 2;
+    const empStartX   = curX + (dw - empTotalW) / 2;
+
+    pos['d' + di] = { x: deptCenterX, y: ROW_Y, dept, color, w: dw };
     deptMap[dept].forEach((emp, ei) => {
-      const ex = dx + (ei - (deptMap[dept].length - 1) / 2) * (NODE_W + 12);
-      positions['e' + emp.id] = { x: ex, y: 160, emp, color: DEPT_COLORS[di % DEPT_COLORS.length] };
+      pos['e' + emp.id] = {
+        x: empStartX + ei * (NODE_W + GAP_X) + NODE_W / 2,
+        y: EMP_Y, emp, color,
+      };
     });
+    curX += dw + DEPT_GAP;
   });
 
-  // 연결선
+  // ── 연결선 ────────────────────────────────────────────────────
   depts.forEach((dept, di) => {
-    const dp = positions['d' + di];
+    const dp = pos['d' + di];
     deptMap[dept].forEach(emp => {
-      const ep = positions['e' + emp.id];
-      const line = document.createElementNS('http://www.w3.org/2000/svg','path');
-      line.setAttribute('d', `M${dp.x},${dp.y + 28} C${dp.x},${(dp.y + ep.y)/2} ${ep.x},${(dp.y + ep.y)/2} ${ep.x},${ep.y}`);
-      line.setAttribute('stroke', dp.color);
-      line.setAttribute('stroke-width','1.5');
-      line.setAttribute('fill','none');
-      line.setAttribute('opacity','0.35');
+      const ep = pos['e' + emp.id];
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const my = (dp.y + DEPT_H + ep.y) / 2;
+      line.setAttribute('d', `M${dp.x},${dp.y + DEPT_H} C${dp.x},${my} ${ep.x},${my} ${ep.x},${ep.y}`);
+      line.setAttribute('stroke', dp.color); line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('fill', 'none'); line.setAttribute('opacity', '0.4');
       g.appendChild(line);
     });
   });
 
-  // 부서 노드
+  // ── 부서 노드 ─────────────────────────────────────────────────
   depts.forEach((dept, di) => {
-    const { x, y, color } = positions['d' + di];
-    const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    bg.setAttribute('x', x - NODE_W/2); bg.setAttribute('y', y);
-    bg.setAttribute('width', NODE_W); bg.setAttribute('height', 28);
-    bg.setAttribute('rx', 9); bg.setAttribute('fill', color); bg.setAttribute('opacity','0.2');
+    const { x, y, color, w } = pos['d' + di];
+    const rx = x - w / 2;
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('x', rx); bg.setAttribute('y', y);
+    bg.setAttribute('width', w); bg.setAttribute('height', DEPT_H);
+    bg.setAttribute('rx', 10); bg.setAttribute('fill', color); bg.setAttribute('opacity', '0.18');
     g.appendChild(bg);
-    const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
-    txt.setAttribute('x', x); txt.setAttribute('y', y + 19);
-    txt.setAttribute('text-anchor','middle'); txt.setAttribute('fill', color);
-    txt.setAttribute('font-size','11'); txt.setAttribute('font-weight','700');
+    const border = bg.cloneNode(); border.setAttribute('fill', 'none');
+    border.setAttribute('stroke', color); border.setAttribute('stroke-width', '1.5'); border.setAttribute('opacity', '0.6');
+    g.appendChild(border);
+    const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    txt.setAttribute('x', x); txt.setAttribute('y', y + 20);
+    txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', color);
+    txt.setAttribute('font-size', '11'); txt.setAttribute('font-weight', '700');
     txt.textContent = dept;
     g.appendChild(txt);
   });
 
-  // 직원 노드
-  Object.values(positions).filter(p => p.emp).forEach(p => {
+  // ── 직원 노드 ─────────────────────────────────────────────────
+  Object.values(pos).filter(p => p.emp).forEach(p => {
     const { x, y, emp, color } = p;
-    // 배경 카드
-    const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    bg.setAttribute('x', x - NODE_W/2); bg.setAttribute('y', y);
+    const lx = x - NODE_W / 2;
+
+    // 카드 배경
+    const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bg.setAttribute('x', lx); bg.setAttribute('y', y);
     bg.setAttribute('width', NODE_W); bg.setAttribute('height', NODE_H);
-    bg.setAttribute('rx', 10); bg.setAttribute('fill','rgba(255,255,255,0.04)');
-    bg.setAttribute('stroke', color); bg.setAttribute('stroke-width','1.5');
+    bg.setAttribute('rx', 10); bg.setAttribute('fill', 'rgba(255,255,255,0.04)');
+    bg.setAttribute('stroke', color); bg.setAttribute('stroke-width', '1.5');
     g.appendChild(bg);
-    // 아바타
-    const avi = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    avi.setAttribute('cx', x - NODE_W/2 + 20); avi.setAttribute('cy', y + NODE_H/2);
-    avi.setAttribute('r','14'); avi.setAttribute('fill', color);
+
+    // 아바타 원
+    const AV_R = 15, AV_CX = lx + 22, AV_CY = y + NODE_H / 2;
+    const avi = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    avi.setAttribute('cx', AV_CX); avi.setAttribute('cy', AV_CY);
+    avi.setAttribute('r', AV_R); avi.setAttribute('fill', color);
     g.appendChild(avi);
-    const it = document.createElementNS('http://www.w3.org/2000/svg','text');
-    it.setAttribute('x', x - NODE_W/2 + 20); it.setAttribute('y', y + NODE_H/2 + 5);
-    it.setAttribute('text-anchor','middle'); it.setAttribute('fill','white');
-    it.setAttribute('font-size','11'); it.setAttribute('font-weight','700');
-    it.textContent = emp.initial || emp.name[0];
-    g.appendChild(it);
-    // 이름
-    const nt = document.createElementNS('http://www.w3.org/2000/svg','text');
-    nt.setAttribute('x', x - NODE_W/2 + 38); nt.setAttribute('y', y + 20);
-    nt.setAttribute('fill','#f1f5f9'); nt.setAttribute('font-size','11'); nt.setAttribute('font-weight','700');
-    nt.textContent = emp.name;
+
+    const avTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    avTxt.setAttribute('x', AV_CX); avTxt.setAttribute('y', AV_CY + 5);
+    avTxt.setAttribute('text-anchor', 'middle'); avTxt.setAttribute('fill', 'white');
+    avTxt.setAttribute('font-size', '11'); avTxt.setAttribute('font-weight', '700');
+    avTxt.textContent = emp.initial || emp.name[0];
+    g.appendChild(avTxt);
+
+    // 이름 (최대 6자)
+    const nameText = emp.name.length > 6 ? emp.name.substring(0, 6) + '…' : emp.name;
+    const nt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    nt.setAttribute('x', lx + 42); nt.setAttribute('y', y + 22);
+    nt.setAttribute('fill', '#f1f5f9'); nt.setAttribute('font-size', '11'); nt.setAttribute('font-weight', '700');
+    nt.textContent = nameText;
     g.appendChild(nt);
-    // 직급
-    const tt = document.createElementNS('http://www.w3.org/2000/svg','text');
-    tt.setAttribute('x', x - NODE_W/2 + 38); tt.setAttribute('y', y + 34);
-    tt.setAttribute('fill','rgba(200,210,230,0.6)'); tt.setAttribute('font-size','9.5');
-    tt.textContent = emp.title;
+
+    // 직급 (최대 8자)
+    const titleText = emp.title.length > 8 ? emp.title.substring(0, 8) + '…' : emp.title;
+    const tt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    tt.setAttribute('x', lx + 42); tt.setAttribute('y', y + 37);
+    tt.setAttribute('fill', 'rgba(200,210,230,0.65)'); tt.setAttribute('font-size', '9');
+    tt.textContent = titleText;
     g.appendChild(tt);
-    // MBTI 배지
+
+    // MBTI 태그
     if (emp.mbti) {
-      const mb = document.createElementNS('http://www.w3.org/2000/svg','rect');
-      mb.setAttribute('x', x - NODE_W/2 + 38); mb.setAttribute('y', y + 39);
-      mb.setAttribute('width','32'); mb.setAttribute('height','13');
-      mb.setAttribute('rx','4'); mb.setAttribute('fill', color); mb.setAttribute('opacity','0.3');
-      g.appendChild(mb);
-      const mt = document.createElementNS('http://www.w3.org/2000/svg','text');
-      mt.setAttribute('x', x - NODE_W/2 + 54); mt.setAttribute('y', y + 50);
-      mt.setAttribute('text-anchor','middle'); mt.setAttribute('fill', color);
-      mt.setAttribute('font-size','8'); mt.setAttribute('font-weight','700');
+      const mt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      mt.setAttribute('x', lx + 42); mt.setAttribute('y', y + 50);
+      mt.setAttribute('fill', color); mt.setAttribute('font-size', '8.5'); mt.setAttribute('opacity', '0.8');
       mt.textContent = emp.mbti;
       g.appendChild(mt);
     }
-    // 투명 클릭 레이어
-    const cl = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    cl.setAttribute('x', x - NODE_W/2); cl.setAttribute('y', y);
-    cl.setAttribute('width', NODE_W); cl.setAttribute('height', NODE_H);
-    cl.setAttribute('rx', 10); cl.setAttribute('fill','transparent');
-    cl.style.cursor = 'pointer';
-    cl.addEventListener('click', ev => {
-      ev.stopPropagation();
-      if (Math.abs(panX - lastPanX) < 4 && Math.abs(panY - lastPanY) < 4) {
-        window.showMemberDetail(emp.id);
-      }
+
+    // 클릭 이벤트
+    bg.style.cursor = 'pointer';
+    bg.addEventListener('click', () => {
+      if (window.showToast) window.showToast(`👤 ${emp.name}`, `${emp.dept} · ${emp.title}\n📧 ${emp.email}`, 'info');
     });
-    g.appendChild(cl);
   });
 
-  // 드래그 팬
-  svg.addEventListener('mousedown', e => {
-    dragging = true; startX = e.clientX; startY = e.clientY;
-    lastPanX = panX; lastPanY = panY;
-    svg.style.cursor = 'grabbing';
-  });
-  window.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    panX = lastPanX + (e.clientX - startX);
-    panY = lastPanY + (e.clientY - startY);
-    applyTransform();
-  });
-  window.addEventListener('mouseup', () => { dragging = false; svg.style.cursor = 'grab'; });
+  // ── 드래그/줌 ─────────────────────────────────────────────────
+  svg.addEventListener('mousedown', e => { dragging = true; startX = e.clientX - panX; startY = e.clientY - panY; lastPX = panX; lastPY = panY; svg.style.cursor = 'grabbing'; });
+  svg.addEventListener('mousemove', e => { if (!dragging) return; panX = e.clientX - startX; panY = e.clientY - startY; applyT(); });
+  svg.addEventListener('mouseup', () => { dragging = false; svg.style.cursor = 'grab'; });
+  svg.addEventListener('mouseleave', () => { dragging = false; svg.style.cursor = 'grab'; });
+  svg.addEventListener('wheel', e => { e.preventDefault(); scale = Math.max(0.3, Math.min(3, scale - e.deltaY * 0.001)); applyT(); }, { passive: false });
 
-  // 줌 버튼
-  document.getElementById('orgZoomIn') ?.addEventListener('click', () => { scale = Math.min(scale + 0.15, 2.5); applyTransform(); });
-  document.getElementById('orgZoomOut')?.addEventListener('click', () => { scale = Math.max(scale - 0.15, 0.4); applyTransform(); });
-  document.getElementById('orgReset')  ?.addEventListener('click', () => { scale = 1; panX = 0; panY = 10; applyTransform(); });
-
-  // 마우스휠 줌
-  svg.addEventListener('wheel', e => {
-    e.preventDefault();
-    scale = Math.max(0.4, Math.min(2.5, scale + (e.deltaY < 0 ? 0.1 : -0.1)));
-    applyTransform();
-  }, { passive: false });
-
-  applyTransform();
+  applyT();
 }
 
 // ═══════════════════════════════════════════════════════════════════════

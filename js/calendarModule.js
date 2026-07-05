@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 📅 calendarModule.js — 업무 캘린더 & 연차 신청 모듈 (v2 - 실시간 등록 수정)
  *
  * 담당 기능:
@@ -13,6 +13,8 @@
 
 window.CalendarModule = (() => {
   let _currentDate  = new Date();   // 현재 표시 중인 년/월
+  let _calFilter = 'all'; // 'all' | 'mine' | 'team'
+
   let _selectedDate = null;         // 현재 선택된 날짜 문자열 (YYYY-MM-DD)
 
   const TYPE_COLORS = {
@@ -54,7 +56,11 @@ window.CalendarModule = (() => {
     const numDays        = new Date(year, month + 1, 0).getDate();
     const today          = new Date();
     const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-    const events         = window.AppState?.events || [];
+    const _allEvents = window.AppState?.events || [];
+    const _curUser   = window.AppState?.currentUser;
+    const events = _calFilter === 'mine' ? _allEvents.filter(e => e.employeeId === _curUser?.id)
+                 : _calFilter === 'team' ? _allEvents.filter(e => e.employeeId !== _curUser?.id)
+                 : _allEvents;
 
     for (let d = 1; d <= numDays; d++) {
       const dateStr     = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -83,7 +89,9 @@ window.CalendarModule = (() => {
 
       const dayEvts = events.filter(e => e.start === dateStr || (dateStr >= e.start && dateStr <= (e.end || e.start)));
       dayEvts.slice(0, 3).forEach(evt => {
-        html += `<div style="background:${evt.color||'var(--primary)'};color:white;font-size:0.68rem;padding:3px 6px;border-radius:4px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="${evt.title}">${evt.title}</div>`;
+        const _isOwn = evt.employeeId === _curUser?.id;
+        const _label = evt.title || '';
+        html += `<div style="background:${evt.color||'var(--primary)'};color:white;font-size:0.68rem;padding:3px 6px;border-radius:4px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:${_isOwn?'1':'0.75'};" title="${_label}">${_label}</div>`;
       });
       if (dayEvts.length > 3) html += `<div style="font-size:0.65rem;color:var(--text-muted);text-align:right;">+${dayEvts.length - 3}개 더</div>`;
 
@@ -198,6 +206,20 @@ window.CalendarModule = (() => {
     }
 
     render();
+
+    // 팀 필터 버튼 연결
+    document.querySelectorAll('.cal-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _calFilter = btn.dataset.filter;
+        document.querySelectorAll('.cal-filter-btn').forEach(b => {
+          const active = b === btn;
+          b.style.background = active ? 'var(--primary)' : 'transparent';
+          b.style.color     = active ? 'white' : 'var(--text-muted)';
+          b.style.borderColor= active ? 'var(--primary)' : 'var(--border-color)';
+        });
+        render();
+      });
+    });
   }
 
   return { init, render, prevMonth, nextMonth, applyLeave, get currentDate() { return _currentDate; } };
