@@ -132,6 +132,8 @@ window.CalendarModule = (() => {
 
     // ③ 내 일정 목록 즉시 업데이트
     if (typeof window._renderMyEventsList === 'function') window._renderMyEventsList();
+    // ③-1 잔여연차/복지포인트 UI 실시간 갱신
+    if (typeof window.updateUIForCurrentUser === 'function') window.updateUIForCurrentUser();
 
     // ④ 성공 토스트
     if (window.showToast) window.showToast('✅ 일정 등록 완료', `[${type}] ${start}${endDate !== start ? ' ~ '+endDate : ''} 캘린더에 즉시 반영되었습니다.`, 'success');
@@ -144,6 +146,7 @@ window.CalendarModule = (() => {
         if (idx !== -1) window.AppState.events[idx] = { ...tempEvent, ...saved };
       }
     } catch(err) { console.warn('[Calendar] CloudDB 저장 실패:', err.message); }
+    if (typeof window.updateUIForCurrentUser === 'function') window.updateUIForCurrentUser();
 
     return tempEvent;
   }

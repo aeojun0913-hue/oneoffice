@@ -1397,11 +1397,11 @@ window.openEventEdit = function(eventId) {
   const evt = AppState.events.find(e => e.id === eventId);
   if (!evt) return;
   const typeLabel = evt.title?.match(/\[(.+)\]/)?.[1] || '기타';
-  document.getElementById('editEventId').value     = evt.id;
-  document.getElementById('editLeaveType').value   = typeLabel;
-  document.getElementById('editLeaveStart').value  = evt.start;
-  document.getElementById('editLeaveEnd').value    = evt.end || evt.start;
-  document.getElementById('editLeaveReason').value = evt.reason || '';
+  { const _e = document.getElementById('editEventId'); if (_e) _e.value = evt.id; }
+  { const _e = document.getElementById('editLeaveType'); if (_e) _e.value = typeLabel; }
+  { const _e = document.getElementById('editLeaveStart'); if (_e) _e.value = evt.start; }
+  { const _e = document.getElementById('editLeaveEnd'); if (_e) _e.value = evt.end || evt.start; }
+  { const _e = document.getElementById('editLeaveReason'); if (_e) _e.value = evt.reason || ''; }
   document.getElementById('eventEditModal')?.classList.add('active');
 };
 
@@ -1434,8 +1434,8 @@ window.openDMPanel = function(empId, empName) {
   }
   const target = String(empId);
   panel._target = target;
-  document.getElementById('dmPanelAvatar').textContent = empName[0];
-  document.getElementById('dmPanelName').textContent   = empName;
+  { const _e = document.getElementById('dmPanelAvatar'); if (_e) _e.textContent = empName[0]; }
+  { const _e = document.getElementById('dmPanelName'); if (_e) _e.textContent = empName; }
 
   // 기존 메시지 로드
   const msgs = AppState.chatLogs[target] || [];
