@@ -1307,27 +1307,33 @@
       <div class="nav-group-label">소통</div>
       <a class="nav-item" data-tab="messenger"><i class="fa-solid fa-comments"></i><span>메신저</span></a>
       <a class="nav-item" data-tab="directory"><i class="fa-solid fa-sitemap"></i><span>조직도 &amp; 구성원</span></a>
+      <a class="nav-item" data-tab="notice"><i class="fa-solid fa-bullhorn"></i><span>공지사항</span><span class="nav-badge" style="background:var(--danger);">NEW</span></a>
+      <a class="nav-item" data-tab="survey"><i class="fa-solid fa-poll"></i><span>설문 / 투표</span></a>
 
       <!-- 업무 -->
       <div class="nav-divider"></div>
       <div class="nav-group-label">업무</div>
       <a class="nav-item" data-tab="calendar"><i class="fa-solid fa-calendar-days"></i><span>업무 캘린더</span></a>
+      <a class="nav-item" data-tab="rooms"><i class="fa-solid fa-door-open"></i><span>회의실 예약</span><span class="nav-badge" style="background:var(--secondary);">NEW</span></a>
       <a class="nav-item" data-tab="reports"><i class="fa-solid fa-file-invoice"></i><span>업무 보고</span></a>
       <a class="nav-item" data-tab="approval"><i class="fa-solid fa-file-circle-check"></i><span>결재 &amp; 문서</span></a>
+
+      <!-- 인사 / 급여 -->
+      <div class="nav-divider"></div>
+      <div class="nav-group-label">인사 / 급여</div>
+      <a class="nav-item" data-tab="contracts"><i class="fa-solid fa-file-signature"></i><span>근로계약서</span><span class="nav-badge" style="background:var(--warning);">NEW</span></a>
+      <a class="nav-item" data-tab="payroll"><i class="fa-solid fa-wallet"></i><span>급여 시스템</span></a>
       <a class="nav-item" data-tab="expense"><i class="fa-solid fa-receipt"></i><span>경비 &amp; 정산</span></a>
 
-      <!-- 급여 / 복지 -->
+      <!-- 복지 / AI -->
       <div class="nav-divider"></div>
-      <div class="nav-group-label">급여 / 복지</div>
-      <a class="nav-item" data-tab="payroll"><i class="fa-solid fa-wallet"></i><span>급여 시스템</span></a>
+      <div class="nav-group-label">복지 / AI</div>
       <a class="nav-item" data-tab="welfare"><i class="fa-solid fa-gift"></i><span>복지 포털</span><span class="nav-badge" style="background:var(--success);">HOT</span></a>
-      
-      
+      <a class="nav-item" data-tab="aioffice"><i class="fa-solid fa-wand-magic-sparkles"></i><span>AI 워크스페이스</span></a>
 
-      <!-- AI / 관리 -->
+      <!-- 관리자 -->
       <div class="nav-divider"></div>
-      <div class="nav-group-label">AI / 관리</div>
-      <a class="nav-item" data-tab="aioffice"><i class="fa-solid fa-wand-magic-sparkles"></i><span>AI 워크스페이스</span><span class="nav-badge">NEW</span></a>
+      <div class="nav-group-label">관리자</div>
       <a class="nav-item" data-tab="hrmanage"><i class="fa-solid fa-shield-halved"></i><span>HR 관리</span></a>
     </nav>
     <div class="user-profile-menu" id="currentUserBtn">
@@ -2916,6 +2922,7 @@
   <script src="js/welfareModule.js"></script>
   <script src="js/calendarModule.js"></script>
   <script src="js/dashboardModule.js"></script>
+  <script src="js/featuresModule.js"></script>
   <script src="js/app.js"></script>
 
   <!-- 레거시 인라인 스크립트 제거 완료 — 모든 로직이 js/ 모듈로 이동되었습니다 -->

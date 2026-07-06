@@ -1143,6 +1143,194 @@ app.get('/api/attendance', requireAuth, (req, res) => {
   res.json({ success: true, records });
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// 📢 공지사항 API
+// ══════════════════════════════════════════════════════════════════════
+app.get('/api/notices', requireAuth, (req, res) => {
+  const db = readDB();
+  const notices = (db[_tKey('notices')] || []).sort((a, b) => {
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+  res.json({ success: true, notices });
+});
+
+app.post('/api/notices', requireAuth, (req, res) => {
+  const { title, content, category, pinned } = req.body;
+  if (!title || !content) return res.status(400).json({ error: '제목과 내용은 필수입니다.' });
+  const db = readDB();
+  if (!db[_tKey('notices')]) db[_tKey('notices')] = [];
+  const notice = {
+    id: Date.now().toString(),
+    title, content,
+    category: category || 'company',
+    pinned: pinned === 'true' || pinned === true,
+    authorId: req.user.id,
+    authorName: req.user.name,
+    createdAt: new Date().toISOString(),
+    readBy: [],
+  };
+  db[_tKey('notices')].unshift(notice);
+  writeDB(db);
+  res.json({ success: true, notice });
+});
+
+app.post('/api/notices/:id/read', requireAuth, (req, res) => {
+  const db = readDB();
+  const notice = (db[_tKey('notices')] || []).find(n => n.id === req.params.id);
+  if (!notice) return res.status(404).json({ error: '공지를 찾을 수 없습니다.' });
+  if (!notice.readBy.includes(req.user.id)) notice.readBy.push(req.user.id);
+  writeDB(db);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 🏢 회의실 예약 API
+// ══════════════════════════════════════════════════════════════════════
+const ROOMS = [
+  { id: 'A', name: 'A룸 — 소회의실', capacity: 4, facilities: '프로젝터, 화이트보드', color: '#3b5bdb' },
+  { id: 'B', name: 'B룸 — 중회의실', capacity: 8, facilities: '대형 TV, 화이트보드, 전화기', color: '#0ca678' },
+  { id: 'C', name: 'C룸 — 대회의실', capacity: 20, facilities: '빔프로젝터, 음향시설, 화상회의', color: '#e67700' },
+  { id: 'D', name: 'D룸 — 임원 회의실', capacity: 6, facilities: '고급 AV, 화상회의', color: '#862e9c' },
+];
+
+app.get('/api/rooms', requireAuth, (req, res) => {
+  res.json({ success: true, rooms: ROOMS });
+});
+
+app.get('/api/room-bookings', requireAuth, (req, res) => {
+  const { date } = req.query;
+  const db = readDB();
+  let bookings = (db[_tKey('roomBookings')] || []);
+  if (date) bookings = bookings.filter(b => b.date === date);
+  res.json({ success: true, bookings });
+});
+
+app.post('/api/room-bookings', requireAuth, (req, res) => {
+  const { roomId, date, startTime, endTime, purpose } = req.body;
+  if (!roomId || !date || !startTime || !endTime) return res.status(400).json({ error: '필수 정보를 입력해주세요.' });
+  const db = readDB();
+  if (!db[_tKey('roomBookings')]) db[_tKey('roomBookings')] = [];
+  // 중복 예약 확인
+  const conflict = db[_tKey('roomBookings')].find(b =>
+    b.roomId === roomId && b.date === date &&
+    !(endTime <= b.startTime || startTime >= b.endTime)
+  );
+  if (conflict) return res.status(409).json({ error: '해당 시간대에 이미 예약이 있습니다.' });
+  const booking = {
+    id: Date.now().toString(),
+    roomId, date, startTime, endTime, purpose: purpose || '회의',
+    bookedBy: req.user.id, bookedByName: req.user.name,
+    createdAt: new Date().toISOString(),
+  };
+  db[_tKey('roomBookings')].push(booking);
+  writeDB(db);
+  res.json({ success: true, booking });
+});
+
+app.delete('/api/room-bookings/:id', requireAuth, (req, res) => {
+  const db = readDB();
+  const bookings = db[_tKey('roomBookings')] || [];
+  const idx = bookings.findIndex(b => b.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: '예약을 찾을 수 없습니다.' });
+  if (bookings[idx].bookedBy !== req.user.id && req.user.role !== 'admin')
+    return res.status(403).json({ error: '본인 예약만 취소할 수 있습니다.' });
+  bookings.splice(idx, 1);
+  writeDB(db);
+  res.json({ success: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 📊 설문 / 투표 API
+// ══════════════════════════════════════════════════════════════════════
+app.get('/api/surveys', requireAuth, (req, res) => {
+  const db = readDB();
+  const surveys = (db[_tKey('surveys')] || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json({ success: true, surveys });
+});
+
+app.post('/api/surveys', requireAuth, (req, res) => {
+  const { title, options, deadline, anonymous } = req.body;
+  if (!title || !options?.length) return res.status(400).json({ error: '제목과 선택지는 필수입니다.' });
+  const db = readDB();
+  if (!db[_tKey('surveys')]) db[_tKey('surveys')] = [];
+  const survey = {
+    id: Date.now().toString(),
+    title, deadline: deadline || null,
+    anonymous: anonymous !== false,
+    options: options.map(o => ({ text: o, votes: [], count: 0 })),
+    authorId: req.user.id, authorName: req.user.name,
+    createdAt: new Date().toISOString(),
+    closed: false,
+  };
+  db[_tKey('surveys')].unshift(survey);
+  writeDB(db);
+  res.json({ success: true, survey });
+});
+
+app.post('/api/surveys/:id/vote', requireAuth, (req, res) => {
+  const { optionIndex } = req.body;
+  const db = readDB();
+  const survey = (db[_tKey('surveys')] || []).find(s => s.id === req.params.id);
+  if (!survey) return res.status(404).json({ error: '설문을 찾을 수 없습니다.' });
+  if (survey.closed) return res.status(400).json({ error: '마감된 설문입니다.' });
+  // 중복 투표 방지
+  const alreadyVoted = survey.options.some(o => o.votes.includes(req.user.id));
+  if (alreadyVoted) return res.status(409).json({ error: '이미 투표하셨습니다.' });
+  if (optionIndex < 0 || optionIndex >= survey.options.length) return res.status(400).json({ error: '잘못된 선택지입니다.' });
+  survey.options[optionIndex].votes.push(req.user.id);
+  survey.options[optionIndex].count++;
+  writeDB(db);
+  res.json({ success: true, survey });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 📝 근로계약서 API
+// ══════════════════════════════════════════════════════════════════════
+app.get('/api/contracts', requireAuth, (req, res) => {
+  const db = readDB();
+  let contracts = db[_tKey('contracts')] || [];
+  // 일반 직원은 본인 계약서만, 관리자는 전체
+  if (req.user.role !== 'admin') {
+    contracts = contracts.filter(c => c.employeeId === req.user.id);
+  }
+  res.json({ success: true, contracts });
+});
+
+app.post('/api/contracts', requireAuth, requireAdmin, (req, res) => {
+  const { employeeId, employeeName, startDate, endDate, position, salary, workHours } = req.body;
+  if (!employeeId || !startDate) return res.status(400).json({ error: '필수 정보를 입력해주세요.' });
+  const db = readDB();
+  if (!db[_tKey('contracts')]) db[_tKey('contracts')] = [];
+  const contract = {
+    id: Date.now().toString(),
+    employeeId, employeeName, startDate, endDate: endDate || null,
+    position: position || '', salary: salary || '',
+    workHours: workHours || '주 40시간',
+    signedAt: null, signedBy: null,
+    createdAt: new Date().toISOString(),
+    status: 'pending', // pending | signed
+  };
+  db[_tKey('contracts')].unshift(contract);
+  writeDB(db);
+  res.json({ success: true, contract });
+});
+
+app.post('/api/contracts/:id/sign', requireAuth, (req, res) => {
+  const { signature } = req.body;
+  if (!signature) return res.status(400).json({ error: '서명을 입력해주세요.' });
+  const db = readDB();
+  const contract = (db[_tKey('contracts')] || []).find(c => c.id === req.params.id);
+  if (!contract) return res.status(404).json({ error: '계약서를 찾을 수 없습니다.' });
+  if (contract.signedAt) return res.status(400).json({ error: '이미 서명된 계약서입니다.' });
+  contract.signedAt = new Date().toISOString();
+  contract.signedBy = signature;
+  contract.status = 'signed';
+  writeDB(db);
+  res.json({ success: true, contract });
+});
+
 
 
 // ══════════════════════════════════════════════════════════════════════

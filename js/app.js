@@ -398,6 +398,12 @@ function _initAllFeatures() {
   _initSVGOrgChart();
   _initAICopilot();
 
+  // 확장 기능 모듈 (featuresModule.js)
+  if (window.NoticeModule)   NoticeModule.init();
+  if (window.RoomModule)     RoomModule.init();
+  if (window.SurveyModule)   SurveyModule.init();
+  if (window.ContractModule) ContractModule.init();
+
   // 초기 렌더
   _updateUIForCurrentUser();
 }
@@ -430,10 +436,15 @@ function _initNavigation() {
       }
     });
     // 탭별 후처리
-    if (tabId === 'calendar') CalendarModule.render?.();
+    if (tabId === 'calendar')  CalendarModule.render?.();
     if (tabId === 'dashboard') _renderDashboard();
-    if (tabId === 'approval') _loadApprovals();
-    if (tabId === 'welfare') setTimeout(_initWelfareMap, 200);
+    if (tabId === 'approval')  _loadApprovals();
+    if (tabId === 'welfare')   setTimeout(_initWelfareMap, 200);
+    // 신규 탭 후처리
+    if (tabId === 'notice')    window.NoticeModule?.load();
+    if (tabId === 'rooms')     window.RoomModule?.loadBookings();
+    if (tabId === 'survey')    window.SurveyModule?.load();
+    if (tabId === 'contracts') window.ContractModule?.load();
   }
 
   navItems.forEach(item => {
