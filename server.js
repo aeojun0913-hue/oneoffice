@@ -143,12 +143,12 @@ function _getDefaultDB() {
         { sender:'received', senderName:'AI Assistant', text:'안녕하세요! OneOffice AI 비서입니다. 노무, 연차, 급여 관련 질문을 자유롭게 해주세요!', timestamp: new Date().toISOString() }
       ],
     },
-    [`oneoffice_${TENANT_ID}_v1_fleaMarketItems`]: _getDefaultMarketItems(),
-    [`oneoffice_${TENANT_ID}_v1_registryEvents`]: _getDefaultRegistryEvents(),
+    [`oneoffice_${TENANT_ID}_v1_fleaMarketItems`]: [],
+    [`oneoffice_${TENANT_ID}_v1_registryEvents`]: [],
     [`oneoffice_${TENANT_ID}_v1_reports`]: [],
     [`oneoffice_${TENANT_ID}_v1_securityLogs`]: [],
     [`oneoffice_${TENANT_ID}_v1_payrollHistory`]: [],
-    [`oneoffice_${TENANT_ID}_v1_busRoutes`]: _getDefaultBusRoutes(),
+    [`oneoffice_${TENANT_ID}_v1_busRoutes`]: [],
     [`oneoffice_${TENANT_ID}_v1_clubMemberships`]: {},
   };
 }
@@ -195,8 +195,6 @@ function _migrateLegacyDB(old) {
   if (old.welfarePoints)           newDB[_tKey('welfarePoints')]   = old.welfarePoints;
   if (old.calendarEvents?.length)  newDB[_tKey('calendarEvents')]  = old.calendarEvents;
   if (old.chatLogs)                newDB[_tKey('chatLogs')]        = old.chatLogs;
-  if (old.fleaMarketItems?.length) newDB[_tKey('fleaMarketItems')] = old.fleaMarketItems;
-  if (old.registryEvents?.length)  newDB[_tKey('registryEvents')]  = old.registryEvents;
   if (old.reports?.length)         newDB[_tKey('reports')]         = old.reports;
   if (old.securityLogs?.length)    newDB[_tKey('securityLogs')]    = old.securityLogs;
   writeDB(newDB);
@@ -520,7 +518,37 @@ function _ruleBasedAI(prompt) {
     return `📌 **주휴수당 계산법 (2026년 기준)**\n\n주휴수당 = (1주 소정근로시간 / 40시간) × 8시간 × 시간급\n\n예시: 시급 10,030원, 주 40시간 근무\n→ 주휴수당 = (40/40) × 8 × 10,030 = **80,240원/주**\n\n⚖️ 근거: 근로기준법 제55조`;
   }
 
-  // 연차/휴가
+  // ── 사내 데이터 연동 폴백 파서 ─────────────────────────────────────────
+  if (p.includes('연차') && (p.includes('남은') || p.includes('며칠') || p.includes('얼마나') || p.includes('조회'))) {
+    const match = prompt.match(/남은 연차 일수:\s*(.*?일)/);
+    if (match) {
+      return `📌 **연차 조회 결과**\n\n현재 남은 연차는 **${match[1]}**입니다. (연간 총 15일 기준)`;
+    }
+  }
+
+  if (p.includes('이메일') || p.includes('연락처') || p.includes('전화번호') || p.includes('mbti') || p.includes('정보') || p.includes('주소')) {
+    const qMatch = prompt.match(/질문:\s*(.*)/i);
+    const question = qMatch ? qMatch[1] : prompt;
+    const lines = prompt.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('- ')) {
+        const empName = line.match(/- ([^\s(]+)/)?.[1];
+        if (empName && question.includes(empName)) {
+          return `📌 **임직원 정보 조회**\n\n${line.substring(2)}`;
+        }
+      }
+    }
+  }
+
+  if (p.includes('휴가자') || p.includes('부재자') || p.includes('오늘 쉬는') || p.includes('부재') || p.includes('쉬는 사람')) {
+    const match = prompt.match(/\[오늘의 휴가\/부재자 목록\]\s*(.*)/);
+    if (match && match[1].trim() !== '없음') {
+      return `📌 **오늘의 휴가/부재자 현황**\n\n오늘 부재 중인 직원은 **${match[1].trim()}**입니다.`;
+    }
+    return `📌 **오늘의 휴가/부재자 현황**\n\n오늘 예정된 부재자(휴가자)가 없습니다. 모두 정상 출근 상태입니다. 🟢`;
+  }
+
+  // 연차 일반
   if (p.includes('연차')) {
     return `📌 **연차 유급휴가 기준 (근로기준법 제60조)**\n\n• 1년 미만: 1개월 개근 시 1일 (최대 11일)\n• 1년 이상: 15일 (기본) + 2년마다 1일 추가 (최대 25일)\n\n⚠️ 미사용 연차는 1년 후 소멸 (연차수당 청구 가능)`;
   }
@@ -923,45 +951,6 @@ app.put('/api/approvals/:id', requireAuth, (req, res) => {
   res.json({ success: true, approval: apr });
 });
 
-// ══════════════════════════════════════════════════════════════════════
-// 🛍️ 플리마켓 API (JWT 인증)
-// ══════════════════════════════════════════════════════════════════════
-app.get('/api/market', requireAuth, (req, res) => {
-  res.json(getCollection('fleaMarketItems', []));
-});
-
-app.post('/api/market', requireAuth, (req, res) => {
-  const { title, category, price, description, image } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  const items = getCollection('fleaMarketItems', []);
-  const newItem = {
-    id:         'item' + Date.now(),
-    title, category, description,
-    price:      Number(price),
-    sellerId:   req.user.sub,
-    sellerName: req.user.name,
-    status:     '판매중',
-    image:      image || 'https://images.unsplash.com/photo-1546213290-e1b7610339e5?w=400',
-    date:       new Date().toISOString().split('T')[0],
-  };
-  items.unshift(newItem);
-  setCollection('fleaMarketItems', items);
-  logSecurity(req.user.name, ip, '마켓 등록', `물품 [${title}] (${Number(price).toLocaleString()}원) 등록`);
-  res.json({ success: true, item: newItem });
-});
-
-app.post('/api/market/:id/status', requireAuth, (req, res) => {
-  const { status } = req.body;
-  const items = getCollection('fleaMarketItems', []);
-  const item  = items.find(i => i.id === req.params.id);
-  if (!item) return res.status(404).json({ success: false, error: '상품을 찾을 수 없습니다.' });
-  if (item.sellerId !== req.user.sub && req.user.role !== 'admin') {
-    return res.status(403).json({ success: false, error: '본인 상품만 수정할 수 있습니다.' });
-  }
-  item.status = status;
-  setCollection('fleaMarketItems', items);
-  res.json({ success: true, item });
-});
 
 // ══════════════════════════════════════════════════════════════════════
 // 💸 복지 포인트 API (JWT 인증)
@@ -1076,59 +1065,7 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-// ══════════════════════════════════════════════════════════════════════
-// 🚌 버스 노선 API (JWT + Admin 관리)
-// ══════════════════════════════════════════════════════════════════════
-app.get('/api/bus-routes', requireAuth, (req, res) => {
-  res.json(getCollection('busRoutes', _getDefaultBusRoutes()));
-});
 
-app.post('/api/bus-routes', requireAuth, requireAdmin, (req, res) => {
-  const { name, stops, time, seats } = req.body;
-  const routes = getCollection('busRoutes', []);
-  routes.push({ id: 'bus' + Date.now(), name, stops, time, seats: seats || 40, registered: 0 });
-  setCollection('busRoutes', routes);
-  logSecurity(req.user.name, req.socket.remoteAddress, '버스 노선 추가', `[${name}] 노선 등록`);
-  res.json({ success: true, routes });
-});
-
-app.delete('/api/bus-routes/:id', requireAuth, requireAdmin, (req, res) => {
-  const routes = getCollection('busRoutes', []).filter(r => r.id !== req.params.id);
-  setCollection('busRoutes', routes);
-  res.json({ success: true, routes });
-});
-
-// ══════════════════════════════════════════════════════════════════════
-// 🎉 경조사 API (JWT 인증)
-// ══════════════════════════════════════════════════════════════════════
-app.post('/api/registry/congratulate', requireAuth, (req, res) => {
-  const { receiverId, receiverName, actionType, giftName, points, message } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
-  if (actionType === 'gift' && points) {
-    const pts = getCollection('welfarePoints', {});
-    const senderPts = pts[String(req.user.sub)] || 0;
-    if (senderPts < points) {
-      return res.status(400).json({ success: false, error: '복지 포인트가 부족합니다.' });
-    }
-    pts[String(req.user.sub)]   = senderPts - points;
-    pts[String(receiverId)]      = (pts[String(receiverId)] || 0) + points;
-    setCollection('welfarePoints', pts);
-  }
-
-  const logs = getCollection('chatLogs', {});
-  const ch   = String(receiverId);
-  if (!logs[ch]) logs[ch] = [];
-  logs[ch].push({
-    sender: 'received', senderName: req.user.name,
-    text: `💌 **축전 도착**: "${message}"${actionType === 'gift' ? `\n🎁 [${giftName}] 기프티콘이 함께 도착했습니다!` : ''}`,
-    timestamp: new Date().toISOString(),
-  });
-  setCollection('chatLogs', logs);
-
-  logSecurity(req.user.name, ip, actionType === 'gift' ? '경조사 선물' : '경조사 축전', `${receiverName}님께 ${actionType === 'gift' ? giftName : '축전'} 발송`);
-  res.json({ success: true });
-});
 
 // ══════════════════════════════════════════════════════════════════════
 // 🏥 서버 상태 모니터링 (인증 불필요 — 헬스체크용)
@@ -1237,24 +1174,4 @@ function _getDefaultEmployees() {
   ];
 }
 
-function _getDefaultMarketItems() {
-  return [
-    { id:'item1', title:'맥북 에어 M2 (스페이스그레이)', category:'digital', price:850000, sellerId:2, sellerName:'John Smith (CTO)', status:'판매중', description:'회의 출장용으로 깔끔하게 사용.', image:'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=400&q=80', date:'2026-07-02' },
-    { id:'item2', title:'저소음 기계식 키보드 (갈축)',    category:'office',  price:45000,  sellerId:6, sellerName:'이민정 (선임)',       status:'예약중', description:'사무실 2달 사용, 갈축.', image:'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=400&q=80', date:'2026-07-01' },
-  ];
-}
 
-function _getDefaultRegistryEvents() {
-  return [
-    { id:'reg1', employeeId:5, employeeName:'김태희 (사원)', eventType:'birthday', eventTitle:'오늘 🎂 생일 이벤트!',          description:'생일 축하 메시지를 보내보세요.', date:'2026-07-03', isToday:true  },
-    { id:'reg2', employeeId:6, employeeName:'이민정 (선임)', eventType:'wedding',  eventTitle:'이번 주 토요일 🤵 결혼식 예고', description:'이민정 선임님의 결혼식이 다가왔습니다.', date:'2026-07-05', isToday:false },
-  ];
-}
-
-function _getDefaultBusRoutes() {
-  return [
-    { id:'bus1', name:'A노선 (강남행)',    stops:'강남역 → 선릉역 → 역삼역 → 사무실',  time:'08:30', seats:40, registered:12 },
-    { id:'bus2', name:'B노선 (홍대행)',    stops:'홍대입구 → 합정 → 마포 → 사무실',    time:'08:45', seats:30, registered:8  },
-    { id:'bus3', name:'C노선 (신도림행)', stops:'신도림역 → 구로디지털단지 → 사무실', time:'08:15', seats:50, registered:22 },
-  ];
-}

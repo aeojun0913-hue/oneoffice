@@ -46,9 +46,9 @@
     },
     {
       "id": 4,
-      "name": "홍길동_수정테스트",
-      "dept": "Technology",
-      "title": "개발팀 (대리)",
+      "name": "홍길동",
+      "dept": "Marketing",
+      "title": "Manager",
       "email": "gildong@company.com",
       "phone": "010-1234-5678",
       "joinDate": "2024-01-01",
@@ -262,125 +262,44 @@
   ],
   "oneoffice_ANTIGRAVITY_v1_securityLogs": [
     {
-      "id": 1783059414326,
-      "timestamp": "2026-07-03T06:16:54.326Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "로그인 완료",
-      "detail": "[EMPLOYEE] 홍길동_수정테스트님 JWT 토큰 발급 성공 (테넌트: ANTIGRAVITY)",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783059408365,
-      "timestamp": "2026-07-03T06:16:48.365Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "OTP 발급",
-      "detail": "2단계 인증 코드 발급 → [EMPLOYEE] 권한 예정",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783059405232,
-      "timestamp": "2026-07-03T06:16:45.232Z",
-      "userName": "GUEST",
-      "ip": "::1",
-      "action": "회사코드 인증",
-      "detail": "[ANTIGRAVITY] 워크스페이스 진입 성공",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466292,
-      "timestamp": "2026-07-03T01:34:26.292Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "AI Mock 응답",
-      "detail": ".env에 API 키 없음. Mock 응답 반환",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466265,
-      "timestamp": "2026-07-03T01:34:26.265Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "급여 계산",
-      "detail": "급여 시뮬레이션 실행 (기본급: 3,000,000원, 실수령: 2,897,636원)",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466233,
-      "timestamp": "2026-07-03T01:34:26.233Z",
-      "userName": "Jane Doe",
+      "id": 1783303010633,
+      "timestamp": "2026-07-06T01:56:50.633Z",
+      "userName": "홍길동",
       "ip": "::1",
       "action": "감사 로그 조회",
-      "detail": "Admin 보안 감사 로그 조회 (15건)",
+      "detail": "Admin 보안 감사 로그 조회 (100건)",
       "severity": "INFO"
     },
     {
-      "id": 1783042466227,
-      "timestamp": "2026-07-03T01:34:26.227Z",
-      "userName": "홍길동_수정테스트",
+      "id": 1783303007280,
+      "timestamp": "2026-07-06T01:56:47.280Z",
+      "userName": "홍길동",
       "ip": "::1",
-      "action": "권한 없음 접근 시도",
-      "detail": "Admin 전용 엔드포인트에 일반 직원 접근 시도: /api/audit-logs",
+      "action": "감사 로그 조회",
+      "detail": "Admin 보안 감사 로그 조회 (5건)",
+      "severity": "INFO"
+    },
+    {
+      "id": 1783302916703,
+      "timestamp": "2026-07-06T01:55:16.703Z",
+      "userName": "gildong@company.com",
+      "ip": "::1",
+      "action": "OTP 실패",
+      "detail": "OTP 보안코드 불일치",
       "severity": "WARN"
     },
     {
-      "id": 1783042466211,
-      "timestamp": "2026-07-03T01:34:26.211Z",
-      "userName": "Jane Doe",
-      "ip": "::1",
-      "action": "로그인 완료",
-      "detail": "[ADMIN] Jane Doe님 JWT 토큰 발급 성공 (테넌트: ANTIGRAVITY)",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466204,
-      "timestamp": "2026-07-03T01:34:26.204Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "로그인 완료",
-      "detail": "[EMPLOYEE] 홍길동_수정테스트님 JWT 토큰 발급 성공 (테넌트: ANTIGRAVITY)",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466193,
-      "timestamp": "2026-07-03T01:34:26.193Z",
+      "id": 1783302851634,
+      "timestamp": "2026-07-06T01:54:11.634Z",
       "userName": "GUEST",
       "ip": "::1",
-      "action": "비밀번호 오류",
-      "detail": "잘못된 비밀번호 시도 (email: gildong@company.com)",
+      "action": "Password Error",
+      "detail": "Wrong password attempt (email: )",
       "severity": "WARN"
     },
     {
-      "id": 1783042466188,
-      "timestamp": "2026-07-03T01:34:26.188Z",
-      "userName": "Jane Doe",
-      "ip": "::1",
-      "action": "OTP 발급",
-      "detail": "2단계 인증 코드 발급 → [ADMIN] 권한 예정",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466182,
-      "timestamp": "2026-07-03T01:34:26.182Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "OTP 발급",
-      "detail": "2단계 인증 코드 발급 → [EMPLOYEE] 권한 예정",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042466173,
-      "timestamp": "2026-07-03T01:34:26.173Z",
-      "userName": "GUEST",
-      "ip": "::1",
-      "action": "회사코드 실패",
-      "detail": "잘못된 코드 입력: \"WRONG_CODE\"",
-      "severity": "WARN"
-    },
-    {
-      "id": 1783042466165,
-      "timestamp": "2026-07-03T01:34:26.165Z",
+      "id": 1783302834608,
+      "timestamp": "2026-07-06T01:53:54.608Z",
       "userName": "GUEST",
       "ip": "::1",
       "action": "회사코드 인증",
@@ -388,44 +307,17 @@
       "severity": "INFO"
     },
     {
-      "id": 1783042373358,
-      "timestamp": "2026-07-03T01:32:53.358Z",
+      "id": 1783301414528,
+      "timestamp": "2026-07-06T01:30:14.528Z",
       "userName": "GUEST",
       "ip": "::1",
-      "action": "비밀번호 오류",
-      "detail": "잘못된 비밀번호 시도 (email: gildong@company.com)",
+      "action": "Password Error",
+      "detail": "Wrong password attempt (email: )",
       "severity": "WARN"
     },
     {
-      "id": 1783042373352,
-      "timestamp": "2026-07-03T01:32:53.352Z",
-      "userName": "Jane Doe",
-      "ip": "::1",
-      "action": "OTP 발급",
-      "detail": "2단계 인증 코드 발급 → [ADMIN] 권한 예정",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042373346,
-      "timestamp": "2026-07-03T01:32:53.346Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "::1",
-      "action": "OTP 발급",
-      "detail": "2단계 인증 코드 발급 → [EMPLOYEE] 권한 예정",
-      "severity": "INFO"
-    },
-    {
-      "id": 1783042373339,
-      "timestamp": "2026-07-03T01:32:53.339Z",
-      "userName": "GUEST",
-      "ip": "::1",
-      "action": "회사코드 실패",
-      "detail": "잘못된 코드 입력: \"WRONG_CODE\"",
-      "severity": "WARN"
-    },
-    {
-      "id": 1783042373332,
-      "timestamp": "2026-07-03T01:32:53.332Z",
+      "id": 1783301397354,
+      "timestamp": "2026-07-06T01:29:57.354Z",
       "userName": "GUEST",
       "ip": "::1",
       "action": "회사코드 인증",
@@ -433,410 +325,54 @@
       "severity": "INFO"
     },
     {
-      "timestamp": "2026-07-03T01:05:49.820Z",
+      "id": 1783301350967,
+      "timestamp": "2026-07-06T01:29:10.967Z",
       "userName": "gildong@company.com",
-      "ip": "127.0.0.1",
-      "action": "MFA 실패",
-      "detail": "OTP 보안코드가 일치하지 않음"
+      "ip": "::1",
+      "action": "OTP 실패",
+      "detail": "OTP 보안코드 불일치",
+      "severity": "WARN"
     },
     {
-      "timestamp": "2026-07-03T01:05:49.814Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
-    },
-    {
-      "timestamp": "2026-07-03T01:05:31.399Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T01:05:31.394Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T01:04:51.445Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-03T01:04:21.795Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-03T01:04:21.788Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-03T01:04:06.232Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-03T01:04:06.225Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-03T00:59:35.925Z",
+      "id": 1783301343410,
+      "timestamp": "2026-07-06T01:29:03.410Z",
       "userName": "gildong@company.com",
-      "ip": "127.0.0.1",
-      "action": "MFA 실패",
-      "detail": "OTP 보안코드가 일치하지 않음"
+      "ip": "::1",
+      "action": "OTP 실패",
+      "detail": "OTP 보안코드 불일치",
+      "severity": "WARN"
     },
     {
-      "timestamp": "2026-07-03T00:59:35.920Z",
-      "userName": "gildong@company.com",
-      "ip": "127.0.0.1",
-      "action": "MFA 실패",
-      "detail": "OTP 보안코드가 일치하지 않음"
-    },
-    {
-      "timestamp": "2026-07-03T00:59:27.456Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T00:59:27.450Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T00:59:21.623Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T00:57:57.211Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T00:57:57.206Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T00:57:50.406Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-03T00:57:23.918Z",
+      "id": 1783301322269,
+      "timestamp": "2026-07-06T01:28:42.269Z",
       "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
+      "ip": "::1",
+      "action": "Password Error",
+      "detail": "Wrong password attempt (email: )",
+      "severity": "WARN"
     },
     {
-      "timestamp": "2026-07-03T00:57:23.914Z",
+      "id": 1783301308566,
+      "timestamp": "2026-07-06T01:28:28.566Z",
       "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-03T00:56:08.845Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-03T00:56:08.841Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-03T00:55:56.077Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
+      "ip": "::1",
       "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
+      "detail": "[ANTIGRAVITY] 워크스페이스 진입 성공",
+      "severity": "INFO"
     },
     {
-      "timestamp": "2026-07-03T00:55:56.069Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T06:51:20.251Z",
-      "userName": "홍길동_성공테스트",
-      "ip": "127.0.0.1",
-      "action": "프로필 수정",
-      "detail": "프로필 정보 수정 (성명: 홍길동_성공테스트 -> 홍길동_수정테스트)"
-    },
-    {
-      "timestamp": "2026-07-02T06:49:17.651Z",
-      "userName": "홍길동_성공테스트",
-      "ip": "127.0.0.1",
+      "timestamp": "2026-07-06T01:11:14.095Z",
+      "userName": "John Smith",
+      "ip": "Browser-Session",
       "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
+      "detail": "[ADMIN] John Smith님 로그인 성공"
     },
     {
-      "timestamp": "2026-07-02T06:49:09.811Z",
-      "userName": "홍길동_성공테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T06:48:44.349Z",
-      "userName": "홍길동_성공테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T06:48:32.614Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-02T06:48:17.540Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T06:46:52.946Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "프로필 수정",
-      "detail": "프로필 정보 수정 (성명: 홍길동_수정테스트 -> 홍길동_성공테스트)"
-    },
-    {
-      "timestamp": "2026-07-02T06:46:05.658Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
+      "timestamp": "2026-07-06T01:02:28.131Z",
+      "userName": "John Smith",
+      "ip": "Browser-Session",
       "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
-    },
-    {
-      "timestamp": "2026-07-02T06:46:05.651Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T06:45:42.464Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T06:45:23.799Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-02T06:45:09.834Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-02T06:44:55.563Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T05:07:01.930Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "106.101.2.150",
-      "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
-    },
-    {
-      "timestamp": "2026-07-02T05:06:55.184Z",
-      "userName": "홍길동_수정테스트",
-      "ip": "106.101.2.150",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T05:06:53.007Z",
-      "userName": "GUEST",
-      "ip": "106.101.2.150",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T05:04:04.853Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "프로필 수정",
-      "detail": "프로필 정보 수정 (성명: 홍길동 -> 홍길동_수정테스트)"
-    },
-    {
-      "timestamp": "2026-07-02T04:59:52.584Z",
-      "userName": "GUEST",
-      "ip": "1.242.57.180",
-      "action": "회사코드 실패",
-      "detail": "잘못된 회사 고유 코드 시도: 1.242.57.180"
-    },
-    {
-      "timestamp": "2026-07-02T04:59:43.592Z",
-      "userName": "GUEST",
-      "ip": "1.242.57.180",
-      "action": "회사코드 실패",
-      "detail": "잘못된 회사 고유 코드 시도: 1.242.57.180"
-    },
-    {
-      "timestamp": "2026-07-02T04:58:38.232Z",
-      "userName": "홍길동",
-      "ip": "1.242.57.180",
-      "action": "휴가 신청",
-      "detail": "새로운 일정 등록: 홍길동 [연차]"
-    },
-    {
-      "timestamp": "2026-07-02T04:58:22.062Z",
-      "userName": "홍길동",
-      "ip": "1.242.57.180",
-      "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
-    },
-    {
-      "timestamp": "2026-07-02T04:58:16.326Z",
-      "userName": "홍길동",
-      "ip": "1.242.57.180",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T04:58:13.245Z",
-      "userName": "GUEST",
-      "ip": "1.242.57.180",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T04:42:44.544Z",
-      "userName": "시스템",
-      "ip": "127.0.0.1",
-      "action": "휴가 신청",
-      "detail": "새로운 일정 등록: 홍길동준 [프로필 수정]"
-    },
-    {
-      "timestamp": "2026-07-02T04:37:03.433Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
-    },
-    {
-      "timestamp": "2026-07-02T04:36:56.751Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T04:36:46.549Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T04:36:44.014Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T04:35:56.268Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "로그인 완료",
-      "detail": "MFA OTP 최종 로그인 성공"
-    },
-    {
-      "timestamp": "2026-07-02T04:35:29.436Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T04:34:45.367Z",
-      "userName": "홍길동",
-      "ip": "127.0.0.1",
-      "action": "이메일 로그인",
-      "detail": "계정 로그인 시도 성공 및 OTP 발송"
-    },
-    {
-      "timestamp": "2026-07-02T04:34:38.308Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T04:34:11.466Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "로그인 실패",
-      "detail": "이메일 로그인 실패 시도: gildong@company.comgildong@company.com"
-    },
-    {
-      "timestamp": "2026-07-02T04:33:55.852Z",
-      "userName": "GUEST",
-      "ip": "127.0.0.1",
-      "action": "회사코드 인증",
-      "detail": "회사 고유 코드 ANTIGRAVITY 인증 성공"
-    },
-    {
-      "timestamp": "2026-07-02T10:00:00.000Z",
-      "userName": "SYSTEM",
-      "ip": "127.0.0.1",
-      "action": "서버 초기화",
-      "detail": "OneOffice 공유 보안 데이터베이스 초기화 완료"
+      "detail": "[ADMIN] John Smith님 로그인 성공"
     }
   ],
   "oneoffice_ANTIGRAVITY_v1_payrollHistory": [
@@ -881,5 +417,24 @@
       "registered": 22
     }
   ],
-  "oneoffice_ANTIGRAVITY_v1_clubMemberships": {}
+  "oneoffice_ANTIGRAVITY_v1_clubMemberships": {},
+  "oneoffice_ANTIGRAVITY_v1_currentSession": {
+    "userId": 4,
+    "userName": "홍길동",
+    "role": "admin",
+    "tenantId": "ANTIGRAVITY",
+    "loginAt": "2026-07-06T01:56:54.173Z"
+  },
+  "oneoffice_ANTIGRAVITY_v1_weatherCache": {
+    "data": {
+      "time": "2026-07-06T01:45",
+      "interval": 900,
+      "temperature": 24.9,
+      "windspeed": 5.3,
+      "winddirection": 118,
+      "is_day": 1,
+      "weathercode": 63
+    },
+    "cachedAt": "2026-07-06T01:56:54.680Z"
+  }
 }

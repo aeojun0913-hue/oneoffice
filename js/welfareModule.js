@@ -16,83 +16,7 @@
  */
 
 window.WelfareModule = (() => {
-  // ── 기본 버스 노선 데이터 ─────────────────────────────────────────
-  const DEFAULT_BUS_ROUTES = [
-    { id:'bus1', name:'A노선 (강남행)',    stops:'강남역 → 선릉역 → 역삼역 → 사무실',   time:'08:30', seats:40, registered:12 },
-    { id:'bus2', name:'B노선 (홍대행)',    stops:'홍대입구 → 합정 → 마포 → 사무실',     time:'08:45', seats:30, registered:8  },
-    { id:'bus3', name:'C노선 (신도림행)', stops:'신도림역 → 구로디지털단지 → 사무실', time:'08:15', seats:50, registered:22 },
-  ];
 
-  async function _getBusRoutes() {
-    return await CloudDB.get('busRoutes', DEFAULT_BUS_ROUTES);
-  }
-
-  // ── 버스 노선 렌더링 ─────────────────────────────────────────────
-  async function renderBusRouteList() {
-    const list = document.getElementById('busRouteAdminList');
-    if (!list) return;
-    const routes = await _getBusRoutes();
-    const isAdmin = AuthModule.isAdmin();
-
-    list.innerHTML = routes.map(r => `
-      <div class="bus-route-card" style="justify-content:space-between; align-items:center;">
-        <div class="bus-route-badge">${r.name}</div>
-        <div class="bus-route-info" style="flex:1; margin:0 12px;">
-          <div class="bus-route-name">${r.stops}</div>
-          <div class="bus-route-loc">출발: ${r.time} | 정원: ${r.seats}명 | 신청: ${r.registered}명</div>
-        </div>
-        ${isAdmin
-          ? `<button class="btn-secondary" style="padding:6px 12px;font-size:0.78rem;" onclick="WelfareModule.deleteBusRoute('${r.id}')">
-               <i class="fa-solid fa-trash"></i> 삭제
-             </button>`
-          : `<button class="btn-primary" style="padding:6px 12px;font-size:0.78rem;" onclick="WelfareModule.applyBusRoute('${r.id}', '${r.name}')">
-               <i class="fa-solid fa-bus"></i> 신청
-             </button>`
-        }
-      </div>
-    `).join('');
-  }
-
-  /** 버스 노선 신청 (Employee) */
-  async function applyBusRoute(id, name) {
-    const user = window.AppState?.currentUser;
-    if (!user) return;
-    const memberships = await CloudDB.get('busApplied', {});
-    if (memberships[user.id] === id) {
-      if (window.showToast) window.showToast('이미 신청됨', `이미 [${name}] 노선을 신청하셨습니다.`, 'warning');
-      return;
-    }
-    memberships[user.id] = id;
-    await CloudDB.set('busApplied', memberships);
-
-    // 신청자 수 업데이트
-    const routes = await _getBusRoutes();
-    const idx = routes.findIndex(r => r.id === id);
-    if (idx !== -1) { routes[idx].registered += 1; await CloudDB.set('busRoutes', routes); }
-
-    await AuthModule.logSecurity(user.name, '버스 노선 신청', `[${name}] 통근버스 신청 완료`);
-    if (window.showToast) window.showToast('🚌 버스 신청 완료', `[${name}] 노선 탑승 신청이 완료되었습니다.`, 'success');
-    renderBusRouteList();
-  }
-
-  /** 버스 노선 추가 (Admin only) */
-  async function addBusRoute(name, stops, time) {
-    if (!AuthModule.isAdmin()) return;
-    const routes = await _getBusRoutes();
-    routes.push({ id: 'bus' + Date.now(), name, stops, time, seats:40, registered:0 });
-    await CloudDB.set('busRoutes', routes);
-    renderBusRouteList();
-    if (window.showToast) window.showToast('🚌 노선 추가 완료', `[${name}] 노선이 등록되었습니다.`, 'success');
-  }
-
-  /** 버스 노선 삭제 (Admin only) */
-  async function deleteBusRoute(id) {
-    if (!AuthModule.isAdmin()) return;
-    const routes = (await _getBusRoutes()).filter(r => r.id !== id);
-    await CloudDB.set('busRoutes', routes);
-    renderBusRouteList();
-    if (window.showToast) window.showToast('삭제 완료', '버스 노선이 삭제되었습니다.', 'info');
-  }
 
   // ── 직원 계정 관리 (Admin 전용) ───────────────────────────────────
   function renderEmpManageList() {
@@ -157,8 +81,8 @@ window.WelfareModule = (() => {
   }
 
   // ── 복지 포인트 ──────────────────────────────────────────────────
-  function renderPointsDisplay(userId) {
-    const pts = CloudDB.get('welfarePoints', {});
+  async function renderPointsDisplay(userId) {
+    const pts = await CloudDB.get('welfarePoints', {});
     const balance = pts[String(userId)] || 0;
     const dashEl  = document.getElementById('dashWelfarePoints');
     const barEl   = document.getElementById('dashPointsBar');
@@ -170,7 +94,7 @@ window.WelfareModule = (() => {
   async function transferPoints(senderId, receiverId, amount, message) {
     const result = await MockAPI.transferWelfarePoints(senderId, receiverId, amount, message);
     if (result.success) {
-      if (window.AppState) window.AppState.welfarePoints = CloudDB.get('welfarePoints', {});
+      if (window.AppState) window.AppState.welfarePoints = await CloudDB.get('welfarePoints', {});
       AuthModule.logSecurity(window.AppState?.currentUser?.name || '?', '복지 포인트 송금',
         `${amount.toLocaleString()}원 → 직원 ID ${receiverId}`);
     }
@@ -186,28 +110,13 @@ window.WelfareModule = (() => {
     return result;
   }
 
-  function getClubMemberships(userId) {
-    const memberships = CloudDB.get('clubMemberships', {});
+  async function getClubMemberships(userId) {
+    const memberships = await CloudDB.get('clubMemberships', {});
     return memberships[userId] || [];
   }
 
   // ── Admin 전용 패널 초기화 ────────────────────────────────────────
   function _initAdminPanels() {
-    // 버스 노선 추가 버튼
-    const addBusBtn = document.getElementById('btnAddBusRoute');
-    if (addBusBtn) {
-      addBusBtn.addEventListener('click', () => {
-        const name  = (document.getElementById('busRouteName')?.value || '').trim();
-        const stops = (document.getElementById('busRouteStops')?.value || '').trim();
-        const time  = document.getElementById('busRouteTime')?.value || '08:30';
-        if (!name || !stops) { if (window.showToast) window.showToast('입력 오류', '노선명과 경유지를 입력하세요.', 'warning'); return; }
-        addBusRoute(name, stops, time);
-        ['busRouteName','busRouteStops'].forEach(id => {
-          const el = document.getElementById(id); if (el) el.value = '';
-        });
-      });
-    }
-
     // 직원 생성 버튼
     const createEmpBtn = document.getElementById('btnCreateEmployee');
     if (createEmpBtn) {
@@ -227,7 +136,6 @@ window.WelfareModule = (() => {
 
   // ── 모듈 초기화 ─────────────────────────────────────────────────
   async function init() {
-    await renderBusRouteList();
     renderEmpManageList();
 
     if (AuthModule.isAdmin()) {
@@ -238,11 +146,7 @@ window.WelfareModule = (() => {
   // ── Public API ────────────────────────────────────────────────────
   return {
     init,
-    renderBusRouteList,
     renderEmpManageList,
-    applyBusRoute,
-    addBusRoute,
-    deleteBusRoute,
     createEmployee,
     removeEmployee,
     renderPointsDisplay,

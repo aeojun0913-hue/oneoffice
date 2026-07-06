@@ -25,8 +25,6 @@ window.AppState = {
   events:          [],     // 캘린더 이벤트
   chatLogs:        {},     // 채팅 로그 { channel: [msg, ...] }
   welfarePoints:   {},     // 복지 포인트 { userId: amount }
-  fleaMarketItems: [],     // 플리마켓 상품
-  registryEvents:  [],     // 경조사 이벤트
   securityLogs:    [],     // 보안 감사 로그
   reports:         [],     // 업무 보고
   activeChatTarget: 'bot', // 현재 활성 채팅 채널
@@ -99,8 +97,7 @@ async function _syncState() {
   AppState.events          = data.calendarEvents  || AppState.events;
   AppState.chatLogs        = data.chatLogs        || AppState.chatLogs;
   AppState.welfarePoints   = data.welfarePoints   || AppState.welfarePoints;
-  AppState.fleaMarketItems = data.fleaMarketItems || AppState.fleaMarketItems;
-  AppState.registryEvents  = data.registryEvents  || AppState.registryEvents;
+
   AppState.reports         = data.reports         || AppState.reports;
   AppState.securityLogs    = data.securityLogs    || AppState.securityLogs;
 
@@ -213,172 +210,7 @@ window.renderChatMessages = function() {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 };
 
-/** 플리마켓 아이템 렌더링 */
-window.renderMarketItems = function() {
-  const grid = document.getElementById('marketItemsGrid');
-  if (!grid) return;
-  const searchVal = (document.getElementById('marketSearch')?.value || '').toLowerCase();
-  const activeCat = document.querySelector('#marketCategoryFilters button.active')?.getAttribute('data-category') || 'all';
-  const filtered  = AppState.fleaMarketItems.filter(item => {
-    const matchSearch = !searchVal || item.title.toLowerCase().includes(searchVal) || (item.description||'').toLowerCase().includes(searchVal);
-    const matchCat    = activeCat === 'all' || item.category === activeCat;
-    return matchSearch && matchCat;
-  });
 
-  if (filtered.length === 0) {
-    grid.innerHTML = `<div style="grid-column:span 3;text-align:center;padding:40px;color:var(--text-muted);">조회 조건에 맞는 상품이 없습니다. 🛍️</div>`;
-    return;
-  }
-
-  grid.innerHTML = filtered.map(item => {
-    const isMyItem    = item.sellerId === AppState.currentUser?.id;
-    const statusColor = item.status === '판매중' ? 'var(--success)' : item.status === '예약중' ? 'var(--warning)' : 'var(--text-muted)';
-    return `<div class="welfare-benefit-card glass glass-interactive" style="flex-direction:column;align-items:stretch;padding:14px;gap:10px;border-radius:14px;min-height:350px;">
-      <div style="position:relative;width:100%;height:160px;overflow:hidden;border-radius:10px;">
-        <img src="${item.image}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1546213290-e1b7610339e5?w=400&q=80'">
-        <span class="nav-badge" style="position:absolute;top:10px;left:10px;background:${statusColor};font-size:0.7rem;color:white;">${item.status}</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex-grow:1;">
-        <div style="font-weight:700;font-size:0.95rem;">${item.title}</div>
-        <div style="font-size:1.1rem;font-weight:700;color:var(--secondary);">${Number(item.price).toLocaleString()}원</div>
-        <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex-grow:1;">${item.description}</div>
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text-muted);border-top:1px dashed var(--border-color);padding-top:8px;margin-top:8px;">
-          <span>👤 ${item.sellerName}</span><span>📅 ${item.date}</span>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:6px;">
-        ${isMyItem
-          ? `<select class="form-control" style="padding:6px;font-size:0.78rem;" onchange="updateMarketItemStatus('${item.id}',this.value)">
-               <option ${item.status==='판매중'?'selected':''}>판매중</option>
-               <option ${item.status==='예약중'?'selected':''}>예약중</option>
-               <option ${item.status==='판매완료'?'selected':''}>판매완료</option>
-             </select>`
-          : `<button class="btn-primary" style="flex-grow:1;padding:8px;font-size:0.8rem;" onclick="startMarketInquiry('${item.id}',${item.sellerId},'${item.title}')">
-               <i class="fa-solid fa-comments"></i> 구매 문의하기
-             </button>`
-        }
-      </div>
-    </div>`;
-  }).join('');
-};
-
-/** 경조사 이벤트 렌더링 */
-window.renderRegistryEvents = function() {
-  const list = document.getElementById('registryEventsList');
-  if (!list) return;
-  const events = AppState.registryEvents;
-  if (events.length === 0) {
-    list.innerHTML = `<div class="glass" style="padding:40px;text-align:center;color:var(--text-muted);">현재 등록된 경조사 일정이 없습니다.</div>`;
-  } else {
-    list.innerHTML = events.map(evt => {
-      const isSelf  = AppState.currentUser?.id === evt.employeeId;
-      const icon    = evt.eventType === 'birthday' ? 'fa-cake-candles' : evt.eventType === 'wedding' ? 'fa-bell' : 'fa-baby';
-      const color   = evt.eventType === 'birthday' ? 'var(--warning)' : evt.eventType === 'wedding' ? 'var(--accent)' : 'var(--secondary)';
-      return `<div class="glass" style="padding:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-radius:14px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:16px;">
-          <div style="width:50px;height:50px;border-radius:50%;border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:${color};">
-            <i class="fa-solid ${icon}"></i>
-          </div>
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <strong style="font-size:1.1rem;">${evt.employeeName}</strong>
-              ${evt.isToday ? `<span class="nav-badge" style="background:var(--danger);font-size:0.65rem;">TODAY</span>` : ''}
-            </div>
-            <div style="font-weight:700;color:${color};font-size:0.9rem;margin-top:4px;">${evt.eventTitle}</div>
-            <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px;">${evt.description}</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          ${isSelf
-            ? `<span style="font-size:0.82rem;color:var(--text-muted);padding:8px;">본인 경조사 🎂</span>`
-            : `<button class="btn-secondary" style="padding:8px 14px;font-size:0.8rem;" onclick="openCongratsModal('${evt.id}',${evt.employeeId},'${evt.employeeName}','${evt.eventTitle}')"><i class="fa-solid fa-envelope"></i> 축전 메시지</button>
-               <button class="btn-primary" style="padding:8px 14px;font-size:0.8rem;" onclick="openGiftModal('${evt.id}',${evt.employeeId},'${evt.employeeName}','${evt.eventTitle}')"><i class="fa-solid fa-gift"></i> 선물 발송</button>`
-          }
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  // 대시보드 미니 위젯
-  const dashList = document.getElementById('dashboardRegistryList');
-  if (dashList) {
-    const todayEvts = events.filter(e => e.isToday);
-    dashList.innerHTML = todayEvts.length === 0
-      ? `<div style="font-size:0.82rem;color:var(--text-muted);text-align:center;padding:10px;width:100%;">오늘 예정된 사내 경조사가 없습니다. 🍰</div>`
-      : todayEvts.map(evt => `
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:0.85rem;padding:6px 0;border-bottom:1px dashed var(--border-color);width:100%;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-weight:700;">${evt.employeeName}</span>
-              <span style="color:var(--accent);font-weight:600;">${evt.eventTitle.split(' ').slice(1).join(' ')}</span>
-            </div>
-            <span style="font-size:0.75rem;color:var(--text-muted);">오늘</span>
-          </div>`).join('');
-  }
-};
-
-/** 마켓 상품 상태 변경 */
-window.updateMarketItemStatus = async function(itemId, newStatus) {
-  const res = await MockAPI.fetchDataFromServer(`/api/market/${itemId}/status`, 'POST',
-    { status: newStatus, userName: AppState.currentUser?.name });
-  if (res !== null) {
-    const item = AppState.fleaMarketItems.find(i => i.id === itemId);
-    if (item) item.status = newStatus;
-    CloudDB.set('fleaMarketItems', AppState.fleaMarketItems);
-  }
-  window.showToast('🛍️ 상품 상태 변경', `상품 상태가 '${newStatus}'(으)로 변경되었습니다.`, 'success');
-};
-
-/** 마켓 구매 문의 → 메신저 DM으로 이동 */
-window.startMarketInquiry = function(itemId, sellerId, itemTitle) {
-  AppState.activeChatTarget = String(sellerId);
-  const chatMsg = `안녕하세요! 중고 플리마켓에 올리신 **'${itemTitle}'** 물품에 대해 문의드립니다. 아직 판매 중이신가요? 🛍️`;
-  MockAPI.saveChatMessage(String(sellerId), 'sent', AppState.currentUser?.name, chatMsg);
-  const msgTabBtn = document.querySelector('.nav-item[data-tab="messenger"]');
-  if (msgTabBtn) msgTabBtn.click();
-};
-
-// ═══════════════════════════════════════════════════════════════════════
-// 🎉 경조사 모달 (전역 함수)
-// ═══════════════════════════════════════════════════════════════════════
-window.openCongratsModal = function(eventId, employeeId, name, eventTitle) {
-  const modal = document.getElementById('congratsCardModal');
-  if (!modal) return;
-  modal.setAttribute('data-event-id', eventId);
-  modal.setAttribute('data-receiver-id', employeeId);
-  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  setEl('congratsTargetName',  name);
-  setEl('congratsTargetEvent', eventTitle);
-
-  const templates = [
-    '기쁜 날 진심으로 축하드립니다! 하시는 모든 일 번창하시길 바라며 즐거운 하루 되세요.',
-    '생일 축하드려요! 🎂 오늘 하루 맛있는 것도 많이 드시고 최고의 해피데이가 되시길 응원합니다.',
-    '결혼을 진심으로 축하드립니다! 🎉 두 분의 앞날에 늘 행복과 기쁨이 충만하길 기원하겠습니다.',
-    '득남/득녀 소식 정말 축하드립니다! 👶 새로운 천사와 함께 더 큰 행복이 가정에 가득하시길 바랍니다.',
-  ];
-  const tplDiv = document.getElementById('congratsTemplates');
-  if (tplDiv) {
-    tplDiv.innerHTML = templates.map((tpl, i) => `
-      <button class="quick-prompt-btn" style="padding:6px 10px;font-size:0.72rem;margin-bottom:4px;" title="${tpl}"
-              onclick="document.getElementById('congratsMessageText').value = this.title">추천 문구 ${i+1}</button>
-    `).join('');
-  }
-  const msgEl = document.getElementById('congratsMessageText');
-  if (msgEl) msgEl.value = templates[0];
-  modal.classList.add('active');
-};
-
-window.openGiftModal = function(eventId, employeeId, name, eventTitle) {
-  const modal = document.getElementById('registryGiftModal');
-  if (!modal) return;
-  modal.setAttribute('data-event-id', eventId);
-  modal.setAttribute('data-receiver-id', employeeId);
-  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  setEl('giftTargetName',  name);
-  setEl('giftTargetEvent', eventTitle);
-  const pts = AppState.welfarePoints[String(AppState.currentUser?.id)] || 0;
-  setEl('senderWelfarePointsDisplay', pts.toLocaleString() + 'p');
-  modal.classList.add('active');
-};
 
 // ═══════════════════════════════════════════════════════════════════════
 // 🏁 DOMContentLoaded — 앱 부트스트랩
@@ -391,8 +223,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     AppState.events          = data.calendarEvents  || [];
     AppState.chatLogs        = data.chatLogs        || {};
     AppState.welfarePoints   = data.welfarePoints   || {};
-    AppState.fleaMarketItems = data.fleaMarketItems || [];
-    AppState.registryEvents  = data.registryEvents  || [];
     AppState.reports         = data.reports         || [];
     AppState.securityLogs    = data.securityLogs    || [];
     AppState.approvals       = data.approvals       || [];
@@ -436,6 +266,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loginOverlay')?.classList.remove('active');
     _updateUIForCurrentUser();
     _initAllFeatures();
+    // 대시보드 모듈 초기화
+    if (window.DashboardModule) window.DashboardModule.init();
   } else {
     // 로그인 필요
     document.getElementById('loginOverlay')?.classList.add('active');
@@ -448,6 +280,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 로그인 후 초기 렌더
       window.renderChatMessages();
       window.renderSecurityAuditLogs();
+
+      // 대시보드 모듈 초기화
+      if (window.DashboardModule) window.DashboardModule.init();
     });
   }
 
@@ -478,9 +313,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     'profileModalClose':        'profileModal',
     'memberDetailModalClose':   'memberDetailModal',
     'floatingChatClose':        null,  // 특수 처리
-    'congratsCardClose':        'congratsCardModal',
-    'registryGiftClose':        'registryGiftModal',
-    'marketRegisterClose':      'marketRegisterModal',
   };
   Object.entries(modalCloseMap).forEach(([btnId, modalId]) => {
     const btn = document.getElementById(btnId);
@@ -501,19 +333,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     floatingBtn.addEventListener('click', () => floatingWindow.classList.toggle('active'));
   }
 
-  // ── 6. 주기적 동기화 (3초마다 — 채팅/마켓/보안로그 변경 감지) ─────
+  // ── 6. 주기적 동기화 (3초마다 — 채팅/보안로그 변경 감지) ─────
   setInterval(async () => {
     if (!AppState.currentUser) return;
 
     const prevChatLen  = (AppState.chatLogs[AppState.activeChatTarget] || []).length;
-    const prevMktLen   = AppState.fleaMarketItems.length;
     const prevLogLen   = AppState.securityLogs.length;
 
     await _syncState();
 
     const curChatLen = (AppState.chatLogs[AppState.activeChatTarget] || []).length;
     if (prevChatLen !== curChatLen)        window.renderChatMessages();
-    if (prevMktLen  !== AppState.fleaMarketItems.length) window.renderMarketItems();
     if (prevLogLen  !== AppState.securityLogs.length)    window.renderSecurityAuditLogs();
 
     _updateUIForCurrentUser();
@@ -541,12 +371,6 @@ function _initAllFeatures() {
   // 프로필 편집
   _initProfileEdit();
 
-  // 플리마켓 필터 & 검색
-  _initMarket();
-
-  // 경조사 탭
-  _initRegistry();
-
   // AI 오피스 (탭 스위칭)
   _initAIOffice();
 
@@ -558,9 +382,6 @@ function _initAllFeatures() {
 
   // 업무 보고 탭
   _initReports();
-
-  // 기분 체크
-  _initMoodCheck();
 
   // 추가 패치 기능 직접 초기화 (통합)
   _initCalendarEditFeatures();
@@ -808,10 +629,16 @@ function _initMessenger() {
     // Bot 자동 응답
     if (target === 'bot') {
       setTimeout(async () => {
-        const aiText = await MockAPI.generateWithAI(text);
-        const botMsg = await MockAPI.saveChatMessage('bot', 'received', 'AI Assistant', aiText);
-        if (!AppState.chatLogs['bot']) AppState.chatLogs['bot'] = [];
-        AppState.chatLogs['bot'].push(botMsg);
+        try {
+          const aiText = await MockAPI.generateWithAI(text);
+          const botMsg = await MockAPI.saveChatMessage('bot', 'received', 'AI Assistant', aiText);
+          if (!AppState.chatLogs['bot']) AppState.chatLogs['bot'] = [];
+          AppState.chatLogs['bot'].push(botMsg);
+        } catch (err) {
+          const errorMsg = await MockAPI.saveChatMessage('bot', 'received', 'AI Assistant', `❌ 에러: ${err.message}`);
+          if (!AppState.chatLogs['bot']) AppState.chatLogs['bot'] = [];
+          AppState.chatLogs['bot'].push(errorMsg);
+        }
         window.renderChatMessages();
       }, 1200);
     }
@@ -878,80 +705,6 @@ function _initProfileEdit() {
 }
 
 // 플리마켓 초기화
-function _initMarket() {
-  document.querySelectorAll('#marketCategoryFilters button').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('#marketCategoryFilters button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
-  const search = document.getElementById('marketSearch');
-  if (search) search.addEventListener('input', window.renderMarketItems);
-
-  const openBtn  = document.getElementById('btnOpenRegisterMarket');
-  const modal    = document.getElementById('marketRegisterModal');
-  if (openBtn && modal) openBtn.addEventListener('click', () => modal.classList.add('active'));
-
-  const form = document.getElementById('marketRegisterForm');
-  if (form) {
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      const title       = document.getElementById('marketItemTitle')?.value.trim();
-      const category    = document.getElementById('marketItemCategory')?.value;
-      const price       = document.getElementById('marketItemPrice')?.value;
-      const description = document.getElementById('marketItemDesc')?.value.trim();
-      const image       = document.getElementById('marketItemImage')?.value.trim();
-      if (!title || !price || !description) { alert('제목, 가격, 설명을 모두 입력해주세요.'); return; }
-
-      const newItem = {
-        id: 'item' + Date.now(), title, category, price: Number(price),
-        sellerId: AppState.currentUser.id,
-        sellerName: AppState.currentUser.name + ' (' + AppState.currentUser.title.split(' ')[0] + ')',
-        description, image, status: '판매중',
-        date: new Date().toISOString().slice(0,10),
-      };
-      AppState.fleaMarketItems.unshift(newItem);
-      CloudDB.set('fleaMarketItems', AppState.fleaMarketItems);
-      await MockAPI.fetchDataFromServer('/api/market', 'POST', newItem);
-
-      window.showToast('🛍️ 마켓 물품 등록', `'${title}'이 마켓에 등록되었습니다.`, 'success');
-      modal?.classList.remove('active');
-      form.reset();
-    });
-  }
-}
-
-// 경조사 탭 초기화
-function _initRegistry() {
-  const congratsModal = document.getElementById('congratsCardModal');
-  document.getElementById('btnSendCongratsMessage')?.addEventListener('click', async () => {
-    const text       = document.getElementById('congratsMessageText')?.value.trim();
-    const receiverId = congratsModal?.getAttribute('data-receiver-id');
-    const receiverName = document.getElementById('congratsTargetName')?.textContent;
-    if (!text) return;
-    await MockAPI.saveChatMessage(String(receiverId), 'sent', AppState.currentUser?.name, text);
-    congratsModal?.classList.remove('active');
-    window.showToast('💌 축전 발송 완료', `${receiverName}님께 축하 메시지를 보냈습니다.`, 'success');
-  });
-
-  const giftModal = document.getElementById('registryGiftModal');
-  document.getElementById('btnSendGiftAndMessage')?.addEventListener('click', async () => {
-    const receiverId   = giftModal?.getAttribute('data-receiver-id');
-    const receiverName = document.getElementById('giftTargetName')?.textContent;
-    const selectedOpt  = document.querySelector('input[name="giftOption"]:checked');
-    if (!selectedOpt) { alert('기프티콘 선물을 선택해주세요.'); return; }
-    const points   = Number(selectedOpt.getAttribute('data-points'));
-    const giftName = selectedOpt.getAttribute('data-name');
-    const msg      = document.getElementById('giftMessageText')?.value.trim() || `${giftName} 선물을 보냅니다! 축하드려요 🎉`;
-
-    const result = await WelfareModule.transferPoints(AppState.currentUser?.id, Number(receiverId), points, msg);
-    if (!result.success) { alert('보유 복지 포인트가 부족합니다.'); return; }
-
-    giftModal?.classList.remove('active');
-    _updateUIForCurrentUser();
-    window.showToast('🎁 선물 발송 성공', `${receiverName}님께 ${giftName} 기프티콘을 발송했습니다.`, 'success');
-  });
-}
 
 // AI 오피스 탭 스위칭 & 7대 기능 비동기 바인딩
 function _initAIOffice() {
@@ -1289,40 +1042,7 @@ function _initAIOffice() {
     });
   }
 
-  // 6. 📢 AI 마케팅 카피라이터
-  const genMarketingBtn = document.getElementById('generateMarketingBtn');
-  const marketingKwInput = document.getElementById('marketingKeyword');
-  const marketingDetailInput = document.getElementById('marketingDetail');
-  const marketingOutput = document.getElementById('marketingOutput');
 
-  if (genMarketingBtn && marketingKwInput && marketingDetailInput && marketingOutput) {
-    genMarketingBtn.addEventListener('click', async () => {
-      const kw = marketingKwInput.value.trim();
-      const det = marketingDetailInput.value.trim();
-      if (!kw) { window.showToast('입력 오류', '핵심 제품명/소재를 입력해 주세요.', 'warning'); return; }
-
-      marketingOutput.innerHTML = '<div style="text-align:center;padding:30px;"><i class="fa-solid fa-spinner fa-spin fa-2xl"></i><div style="margin-top:14px;font-size:0.85rem;">최적의 광고 마케팅 카피 문구를 추천받는 중...</div></div>';
-      genMarketingBtn.disabled = true;
-
-      try {
-        const prompt = `다음 핵심 키워드와 특징 정보를 조합하여, 
-1) 공식 보도자료 첫 문장 헤드라인
-2) 인스타그램 홍보용 트렌디한 감성 카피 3가지 시안
-3) 링크드인(비즈니스용) 설득형 카피 1가지 시안을 각각 작성해줘. 해시태그와 적절한 이모티콘도 포함해줘.
-
-핵심 소재: ${kw}
-세부 특징: ${det}`;
-
-        const aiText = await MockAPI.generateWithAI(prompt);
-        marketingOutput.innerHTML = `<div style="white-space:pre-wrap; font-size:0.88rem; line-height:1.7;">${aiText}</div>`;
-        window.showToast('🤖 카피 생성 완료', '마케팅 카피 추천 리스트가 생성되었습니다.', 'success');
-      } catch (err) {
-        marketingOutput.innerHTML = '<div style="color:var(--danger);">카피 문구 생성 도중 오류가 발생했습니다.</div>';
-      } finally {
-        genMarketingBtn.disabled = false;
-      }
-    });
-  }
 
   // 7. 👥 1on1 면담 코치
   const genOneonBtn = document.getElementById('generateOneonBtn');
@@ -1428,22 +1148,7 @@ function _initReports() {
   }
 }
 
-// 기분 체크 초기화
-function _initMoodCheck() {
-  document.querySelectorAll('.mood-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      window.showToast('😊 기분 체크 완료', '오늘의 감정 상태가 기록되었습니다.', 'success');
-    });
-  });
-  const chart = document.getElementById('moodTrendChart');
-  if (chart) {
-    chart.innerHTML = `<svg viewBox="0 0 300 100" style="width:100%;height:100px;">
-      <polyline fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
-                points="20,80 60,65 100,50 140,75 180,45 220,55 260,35"/>
-      ${[20,60,100,140,180,220,260].map((x,i)=>`<circle cx="${x}" cy="${[80,65,50,75,45,55,35][i]}" r="4" fill="var(--success)"/>`).join('')}
-    </svg>`;
-  }
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // 📅 캘린더 이벤트 수정/삭제 기능
@@ -1734,6 +1439,7 @@ window.toggleWishlist = function(itemId) {
     window.showToast('🤍 찜 해제', '관심 목록에서 제거되었습니다.', 'info');
   }
   localStorage.setItem('oo_wishlist', JSON.stringify(wishes));
+  window.renderMarketItems();
 };
 
 // 플리마켓 렌더 함수 패치 — 찜 기능 추가
@@ -2405,8 +2111,38 @@ function _initAICopilot() {
       }
 
       // ── Gemini AI 일반 답변 ──────────────────────────────────────
-      const prompt = `당신은 OneOffice 사내 AI 비서입니다. 현재 로그인 사용자: ${
-        user ? `${user.name} (${user.dept} · ${user.title})` : '알 수 없음'}.\n질문: ${t}`;
+      const todayStr = new Date().toLocaleDateString('ko-KR');
+      const usedLeave = AppState.events.filter(e =>
+        e.employeeId === user?.id && e.type === 'leave' && e.start <= today
+      ).reduce((s, e) => s + (Number(e.leaveDays) || 0), 0);
+      const remainLeave = Math.max(0, 15 - usedLeave);
+
+      const empsInfo = AppState.employees.map(e => 
+        `- ${e.name} (${e.dept} · ${e.title}): 이메일: ${e.email}, 연락처: ${e.phone}, MBTI: ${e.mbti || '미등록'}, 성향: ${e.workStyle || '미등록'}`
+      ).join('\n');
+
+      const absentEmps = AppState.employees.filter(emp => {
+        const evt = AppState.events.find(e =>
+          e.employeeId === emp.id &&
+          e.start <= today && (e.end || e.start) >= today
+        );
+        return evt && evt.type === 'leave';
+      }).map(e => e.name).join(', ');
+
+      const prompt = `당신은 OneOffice 사내 AI 비서입니다.
+현재 날짜: ${todayStr}
+현재 로그인 사용자: ${user ? `${user.name} (${user.dept} · ${user.title}, ID: ${user.id})` : '알 수 없음'}
+남은 연차 일수: ${remainLeave}일 (연간 총 15일 중 ${usedLeave}일 사용)
+
+[사내 구성원 연락처 및 프로필 정보]
+${empsInfo}
+
+[오늘의 휴가/부재자 목록]
+${absentEmps || '없음'}
+
+위 사내 정보(실데이터)에 기반하여 사용자의 질문에 친절하고 정확하게 답변해 주세요.
+질문: ${t}`;
+
       const aiText = await MockAPI.generateWithAI(prompt);
       updateLoad(aiText || '답변을 가져오지 못했습니다.');
 
@@ -2430,7 +2166,7 @@ async function _loadApprovals() {
   const user = AppState.currentUser;
   if (!user) return;
   try {
-    const token = localStorage.getItem('oo_token');
+    const token = sessionStorage.getItem('oneoffice_jwt');
     const res = await fetch('/api/approvals?employeeId=' + user.id, {
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -2493,7 +2229,7 @@ function _renderApprovals(data) {
 
 window._approvalAction = async function(id, action) {
   const comment = document.getElementById('cmt_' + id)?.value || '';
-  const token   = localStorage.getItem('oo_token');
+  const token   = sessionStorage.getItem('oneoffice_jwt');
   try {
     const res  = await fetch('/api/approvals/' + id, {
       method: 'PUT',
@@ -2517,7 +2253,7 @@ window._approvalAction = async function(id, action) {
 
 window._createApproval = async function(approvalData) {
   const user  = AppState.currentUser;
-  const token = localStorage.getItem('oo_token');
+  const token = sessionStorage.getItem('oneoffice_jwt');
   const approverMap = {1:null,2:1,3:1,4:2,5:2,6:2};
   const approverId  = approverMap[user?.id] ?? 2;
   try {

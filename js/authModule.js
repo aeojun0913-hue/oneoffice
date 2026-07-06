@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 🔐 authModule.js — SaaS 핵심 모듈 3: 인증/RBAC/세션 관리
  *
  * 담당 기능:
@@ -28,12 +28,9 @@ window.AuthModule = (() => {
     { tab:'approval',  icon:'fa-file-circle-check',    label:'결재 & 문서',         roles:['admin','employee'] },
     { tab:'hrmanage',  icon:'fa-shield-halved',        label:'HR 관리',             roles:['admin'], badge:'ADMIN', badgeColor:'var(--danger)' },
     { tab:'empmanage', icon:'fa-user-gear',            label:'직원 계정 관리',      roles:['admin'], badge:'ADMIN', badgeColor:'var(--danger)' },
-    { tab:'busmanage', icon:'fa-bus',                  label:'버스 노선 관리',      roles:['admin'], badge:'ADMIN', badgeColor:'var(--danger)' },
     { tab:'expense',   icon:'fa-receipt',              label:'경비 & 자산',         roles:['admin','employee'] },
     { tab:'reports',   icon:'fa-file-invoice',         label:'업무 보고',           roles:['admin','employee'] },
     { tab:'messenger', icon:'fa-comments',             label:'메신저',              roles:['admin','employee'] },
-    { tab:'market',    icon:'fa-store',                label:'사내 플리마켓',       roles:['admin','employee'] },
-    { tab:'registry',  icon:'fa-cake-candles',         label:'경조사 캘린더',       roles:['admin','employee'] },
   ];
 
   let _currentRole = 'employee';
@@ -173,7 +170,7 @@ window.AuthModule = (() => {
       if (res === null) {
         // 서버 없음 → LocalStorage 모드: 'ANTIGRAVITY' 코드만 허용
         if (code !== 'ANTIGRAVITY') { setError('잘못된 회사 코드입니다. (힌트: ANTIGRAVITY)'); return; }
-      } else if (!res.ok && res.status !== undefined) {
+      } else if (res.success === false) {
         setError('잘못된 회사 코드입니다. (힌트: ANTIGRAVITY)'); return;
       }
 
