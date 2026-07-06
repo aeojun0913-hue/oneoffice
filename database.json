@@ -489,6 +489,16 @@
       "is_day": 1,
       "weathercode": 55
     },
-    "cachedAt": "2026-07-06T04:19:47.569Z"
-  }
+    "cachedAt": "2026-07-06T04:26:38.970Z"
+  },
+  "attendance": [
+    {
+      "id": "1783311999552",
+      "employeeId": 4,
+      "date": "2026-07-06",
+      "checkIn": "2026-07-06T04:26:39.548Z",
+      "checkOut": null,
+      "tenantId": "ANTIGRAVITY"
+    }
+  ]
 }
