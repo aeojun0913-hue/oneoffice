@@ -262,6 +262,60 @@
   ],
   "oneoffice_ANTIGRAVITY_v1_securityLogs": [
     {
+      "id": 1783311570492,
+      "timestamp": "2026-07-06T04:19:30.492Z",
+      "userName": "홍길동",
+      "ip": "::1",
+      "action": "감사 로그 조회",
+      "detail": "Admin 보안 감사 로그 조회 (15건)",
+      "severity": "INFO"
+    },
+    {
+      "id": 1783311519223,
+      "timestamp": "2026-07-06T04:18:39.223Z",
+      "userName": "GUEST",
+      "ip": "::1",
+      "action": "Password Error",
+      "detail": "Wrong password attempt (email: )",
+      "severity": "WARN"
+    },
+    {
+      "id": 1783311505752,
+      "timestamp": "2026-07-06T04:18:25.752Z",
+      "userName": "GUEST",
+      "ip": "::1",
+      "action": "회사코드 인증",
+      "detail": "[ANTIGRAVITY] 워크스페이스 진입 성공",
+      "severity": "INFO"
+    },
+    {
+      "id": 1783311129162,
+      "timestamp": "2026-07-06T04:12:09.162Z",
+      "userName": "GUEST",
+      "ip": "::1",
+      "action": "회사코드 인증",
+      "detail": "[ANTIGRAVITY] 워크스페이스 진입 성공",
+      "severity": "INFO"
+    },
+    {
+      "id": 1783311119996,
+      "timestamp": "2026-07-06T04:11:59.996Z",
+      "userName": "GUEST",
+      "ip": "::1",
+      "action": "회사코드 실패",
+      "detail": "잘못된 코드 입력: \"ONEOFFICE\"",
+      "severity": "WARN"
+    },
+    {
+      "id": 1783311106523,
+      "timestamp": "2026-07-06T04:11:46.523Z",
+      "userName": "GUEST",
+      "ip": "::1",
+      "action": "회사코드 실패",
+      "detail": "잘못된 코드 입력: \"ONEOFFICE\"",
+      "severity": "WARN"
+    },
+    {
       "id": 1783303010633,
       "timestamp": "2026-07-06T01:56:50.633Z",
       "userName": "홍길동",
@@ -427,14 +481,14 @@
   },
   "oneoffice_ANTIGRAVITY_v1_weatherCache": {
     "data": {
-      "time": "2026-07-06T01:45",
+      "time": "2026-07-06T04:15",
       "interval": 900,
-      "temperature": 24.9,
-      "windspeed": 5.3,
-      "winddirection": 118,
+      "temperature": 26.5,
+      "windspeed": 5.4,
+      "winddirection": 184,
       "is_day": 1,
-      "weathercode": 63
+      "weathercode": 55
     },
-    "cachedAt": "2026-07-06T01:56:54.680Z"
+    "cachedAt": "2026-07-06T04:19:47.569Z"
   }
 }

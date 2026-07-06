@@ -175,14 +175,23 @@ function readDB() {
   }
 }
 
-/** DB 쓰기 (원자적 파일 교체) */
+/** DB 쓰기 (OneDrive 호환 - 직접 쓰기) */
 function writeDB(data) {
-  try {
-    const tmp = DB_PATH + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8');
-    fs.renameSync(tmp, DB_PATH);
-  } catch (err) {
-    console.error('[DB] 쓰기 실패:', err.message);
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+      return; // 성공
+    } catch (err) {
+      retries--;
+      if (retries === 0) {
+        console.error('[DB] 쓰기 최종 실패:', err.message);
+      } else {
+        // 짧은 대기 후 재시도 (OneDrive 잠금 해제 대기)
+        const waitEnd = Date.now() + 100;
+        while (Date.now() < waitEnd) {} // 100ms 동기 대기
+      }
+    }
   }
 }
 
@@ -1063,6 +1072,75 @@ app.delete('/api/employees/:id', requireAuth, requireAdmin, (req, res) => {
   setCollection('employees', employees.filter(e => String(e.id) !== id));
   logSecurity(req.user.name, ip, '직원 계정 삭제', `[${emp.name}] 계정 삭제`, 'WARN');
   res.json({ success: true });
+});
+
+
+
+// ══════════════════════════════════════════════════════════════════════
+// 📋 출퇴근 기록 API
+// ══════════════════════════════════════════════════════════════════════
+app.post('/api/attendance/check-in', requireAuth, (req, res) => {
+  const { employeeId, time } = req.body;
+  if (!employeeId || !time) return res.status(400).json({ error: '잘못된 요청입니다.' });
+
+  const db = readDB();
+  if (!db.attendance) db.attendance = [];
+
+  const today = new Date(time).toISOString().split('T')[0];
+  // 오늘 이미 출근 기록 있으면 덮어쓰지 않음
+  const existing = db.attendance.find(a => a.employeeId === employeeId && a.date === today);
+  if (existing) return res.json({ success: true, message: '이미 출근 기록이 있습니다.', record: existing });
+
+  const record = {
+    id: Date.now().toString(),
+    employeeId,
+    date: today,
+    checkIn: time,
+    checkOut: null,
+    tenantId: TENANT_ID,
+  };
+  db.attendance.push(record);
+  writeDB(db);
+  res.json({ success: true, record });
+});
+
+app.post('/api/attendance/check-out', requireAuth, (req, res) => {
+  const { employeeId, time } = req.body;
+  if (!employeeId || !time) return res.status(400).json({ error: '잘못된 요청입니다.' });
+
+  const db = readDB();
+  if (!db.attendance) db.attendance = [];
+
+  const today = new Date(time).toISOString().split('T')[0];
+  const record = db.attendance.find(a => a.employeeId === employeeId && a.date === today);
+
+  if (!record) {
+    // 출근 기록 없이 퇴근 → 그냥 기록
+    const newRecord = {
+      id: Date.now().toString(),
+      employeeId,
+      date: today,
+      checkIn: null,
+      checkOut: time,
+      tenantId: TENANT_ID,
+    };
+    db.attendance.push(newRecord);
+    writeDB(db);
+    return res.json({ success: true, record: newRecord });
+  }
+
+  record.checkOut = time;
+  writeDB(db);
+  res.json({ success: true, record });
+});
+
+app.get('/api/attendance', requireAuth, (req, res) => {
+  const { employeeId, date } = req.query;
+  const db = readDB();
+  let records = (db.attendance || []).filter(a => a.tenantId === TENANT_ID);
+  if (employeeId) records = records.filter(a => a.employeeId === Number(employeeId) || a.employeeId === employeeId);
+  if (date)       records = records.filter(a => a.date === date);
+  res.json({ success: true, records });
 });
 
 

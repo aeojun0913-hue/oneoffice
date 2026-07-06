@@ -354,6 +354,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 // 🔧 기능 모듈 일괄 초기화 (로그인 후 1회 실행)
 // ═══════════════════════════════════════════════════════════════════════
 function _initAllFeatures() {
+  // ── 0. 사이드바 네비게이션 전환 (핵심 라우터) ─────────────────────
+  _initNavigation();
+
   // 각 모듈 초기화
   CalendarModule.init();
   SalaryModule.init();
@@ -397,6 +400,63 @@ function _initAllFeatures() {
 
   // 초기 렌더
   _updateUIForCurrentUser();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🗂️ 사이드바 네비게이션 라우터 (탭 전환)
+// ═══════════════════════════════════════════════════════════════════════
+function _initNavigation() {
+  const navItems    = document.querySelectorAll('.nav-item[data-tab]');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  function switchTab(tabId) {
+    // 모든 탭 숨김
+    tabContents.forEach(s => {
+      s.classList.remove('active');
+      s.style.display = 'none';
+    });
+    // 해당 탭 표시
+    const target = document.getElementById(tabId);
+    if (target) {
+      target.classList.add('active');
+      target.style.display = '';
+    }
+    // 사이드바 active 상태 업데이트
+    navItems.forEach(item => {
+      if (item.getAttribute('data-tab') === tabId) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+    // 탭별 후처리
+    if (tabId === 'calendar') CalendarModule.render?.();
+    if (tabId === 'dashboard') _renderDashboard();
+    if (tabId === 'approval') _loadApprovals();
+    if (tabId === 'welfare') setTimeout(_initWelfareMap, 200);
+  }
+
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tabId = item.getAttribute('data-tab');
+      if (tabId) switchTab(tabId);
+    });
+  });
+
+  // 대시보드 가젯 action 버튼 (예: 결재 가젯의 🔗 버튼)
+  document.querySelectorAll('.gadget-action-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.getAttribute('data-tab');
+      if (tabId) switchTab(tabId);
+    });
+  });
+
+  // 초기 상태: 대시보드 탭 활성화
+  switchTab('dashboard');
+
+  // 전역 노출 (다른 곳에서도 탭 이동 가능)
+  window.switchTab = switchTab;
 }
 
 // 대시보드 렌더
@@ -1087,26 +1147,110 @@ MBTI 성향: ${emp.mbti || '알 수 없음'}
   }
 }
 
-// 출퇴근 버튼
+// 출퇴근 버튼 (사이드바 위젯 - ID: btnClockIn / btnClockOut)
 function _initAttendance() {
-  let clockInTime = null;
-  const clockInBtn  = document.getElementById('clockInBtn');
-  const clockOutBtn = document.getElementById('clockOutBtn');
-  const clockStatus = document.getElementById('clockStatus');
+  let clockInTime  = null;
+  let workInterval = null;
+
+  // HTML의 실제 ID로 연결
+  const clockInBtn  = document.getElementById('btnClockIn');
+  const clockOutBtn = document.getElementById('btnClockOut');
+  const clockStatus = document.getElementById('sidebarAttendStatus');
+  const elClockInTime  = document.getElementById('sidebarClockInTime');
+  const elClockOutTime = document.getElementById('sidebarClockOutTime');
+  const elWorkDuration = document.getElementById('sidebarWorkDuration');
+
+  // 근무 시간 실시간 업데이트
+  function _startWorkTimer() {
+    if (workInterval) clearInterval(workInterval);
+    workInterval = setInterval(() => {
+      if (!clockInTime) return;
+      const diffMs  = Date.now() - clockInTime.getTime();
+      const diffH   = Math.floor(diffMs / 3600000);
+      const diffM   = Math.floor((diffMs % 3600000) / 60000);
+      const diffS   = Math.floor((diffMs % 60000) / 1000);
+      if (elWorkDuration) {
+        elWorkDuration.textContent = `${String(diffH).padStart(2,'0')}:${String(diffM).padStart(2,'0')}:${String(diffS).padStart(2,'0')}`;
+      }
+    }, 1000);
+  }
+
   if (clockInBtn) {
-    clockInBtn.addEventListener('click', () => {
+    clockInBtn.addEventListener('click', async () => {
+      if (clockInTime) {
+        window.showToast('이미 출근 완료', '이미 출근 기록이 있습니다.', 'warning');
+        return;
+      }
       clockInTime = new Date();
-      if (clockStatus) clockStatus.textContent = `출근: ${clockInTime.toTimeString().split(' ')[0]}`;
-      window.showToast('🟢 출근 완료', `${clockInTime.toTimeString().split(' ')[0]} 출근이 기록되었습니다.`, 'success');
+      const timeStr = clockInTime.toTimeString().slice(0, 8);
+
+      // UI 업데이트
+      if (elClockInTime) elClockInTime.textContent = timeStr.slice(0,5);
+      if (clockStatus)   clockStatus.textContent   = `✅ 출근 중`;
+      clockInBtn.disabled = true;
+      clockInBtn.style.opacity = '0.5';
+
+      // 실시간 근무시간 카운터 시작
+      _startWorkTimer();
+
+      // 서버에 출근 기록 저장
+      try {
+        const token = sessionStorage.getItem('oneoffice_jwt');
+        const user  = AppState.currentUser;
+        if (user && token) {
+          await fetch('/api/attendance/check-in', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ employeeId: user.id, time: clockInTime.toISOString() }),
+          });
+        }
+      } catch(err) { console.warn('출근 API 저장 실패 (로컬 기록 유지):', err); }
+
+      window.showToast('🟢 출근 완료', `${timeStr.slice(0,5)} 출근이 기록되었습니다.`, 'success');
+
+      // 대시보드 잔여연차 실시간 갱신
+      _renderDashboard();
     });
   }
+
   if (clockOutBtn) {
-    clockOutBtn.addEventListener('click', () => {
+    clockOutBtn.addEventListener('click', async () => {
       const now = new Date();
-      const worked = clockInTime ? Math.round((now - clockInTime) / 60000) : 0;
-      if (clockStatus) clockStatus.textContent = `퇴근: ${now.toTimeString().split(' ')[0]} (근무 ${worked}분)`;
-      window.showToast('🔴 퇴근 완료', `${now.toTimeString().split(' ')[0]} 퇴근이 기록되었습니다.`, 'info');
+      const timeStr = now.toTimeString().slice(0, 8);
+      const workedMs = clockInTime ? now - clockInTime : 0;
+      const workedH  = Math.floor(workedMs / 3600000);
+      const workedM  = Math.floor((workedMs % 3600000) / 60000);
+
+      // UI 업데이트
+      if (elClockOutTime) elClockOutTime.textContent = timeStr.slice(0,5);
+      if (clockStatus)    clockStatus.textContent    = `🔴 퇴근 완료 (${workedH}시간 ${workedM}분 근무)`;
+      if (workInterval)   clearInterval(workInterval);
+      clockOutBtn.disabled = true;
+      clockOutBtn.style.opacity = '0.5';
+
+      // 서버에 퇴근 기록 저장
+      try {
+        const token = sessionStorage.getItem('oneoffice_jwt');
+        const user  = AppState.currentUser;
+        if (user && token) {
+          await fetch('/api/attendance/check-out', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ employeeId: user.id, time: now.toISOString() }),
+          });
+        }
+      } catch(err) { console.warn('퇴근 API 저장 실패 (로컬 기록 유지):', err); }
+
+      window.showToast('🔴 퇴근 완료', `${timeStr.slice(0,5)} 퇴근이 기록되었습니다. 수고하셨습니다!`, 'info');
     });
+  }
+
+  // 오늘 날짜 업데이트
+  const sidebarDate = document.getElementById('sidebarAttendDate');
+  if (sidebarDate) {
+    const d = new Date();
+    const days = ['일','월','화','수','목','금','토'];
+    sidebarDate.textContent = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} (${days[d.getDay()]})`;
   }
 }
 
